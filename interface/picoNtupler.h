@@ -444,7 +444,7 @@ bool PassMuTauTrig2022(UInt_t ntrig,Vec_i trig_id,Vec_i trig_bits,Vec_t trig_pt,
     const ROOT::Math::PtEtaPhiMVector trig(trig_pt[it],trig_eta[it],trig_phi[it],0);
     float dR = deltaR(trig.Eta(),tau_eta,trig.Phi(),tau_phi);
     if (dR < 0.5){ //dR < 0.5
-      if((trig_bits[it] & (1<<8)) != 0 && (trig_bits[it] & (1<<27)) != 0 && trig_id[it] == 15){ 
+      if((trig_bits[it] & (1<<8)) != 0 && (trig_bits[it] & (1<<3)) != 0 && (trig_bits[it] & (1<<27)) != 0 && trig_id[it] == 15){ 
           return true;
       }
     }
@@ -458,7 +458,7 @@ bool PassEleTauTrig2022(UInt_t ntrig,Vec_t trig_l1pt, Vec_i trig_l1iso, Vec_i tr
     const ROOT::Math::PtEtaPhiMVector trig(trig_pt[it],trig_eta[it],trig_phi[it],0);
     float dR = deltaR(trig.Eta(),tau_eta,trig.Phi(),tau_phi);
     if (dR < 0.5){ //dR < 0.5
-      if((trig_bits[it] & (1<<8)) != 0 && (trig_bits[it] & (1<<27)) != 0 && trig_id[it] == 15 && trig_pt[it] > 30 && trig_l1iso[it] > 0 && trig_l1pt[it] > 26){ 
+      if((trig_bits[it] & (1<<8)) != 0 && (trig_bits[it] & (1<<3)) != 0 && (trig_bits[it] & (1<<27)) != 0 && trig_id[it] == 15 && trig_pt[it] > 30 && trig_l1iso[it] > 0 && trig_l1pt[it] > 26){ 
           return true;
       }
     }
@@ -473,7 +473,7 @@ bool PassDiTauTrig2022(UInt_t ntrig,Vec_t trig_l1pt, Vec_i trig_l1iso, Vec_i tri
     float dR = deltaR(trig.Eta(),tau_eta,trig.Phi(),tau_phi);
     if (dR < 0.5){ //dR < 0.5, 1 => Medium, 17 => Monitoring, 18 => MonitoringForVBFIsoTau, bit1 && bit17 && !bit18
       // drop !bit18 cut
-      if((trig_bits[it] & (1<<1)) != 0 && (trig_bits[it] & (1<<18)) != 0 && trig_id[it] == 15 && trig_pt[it] > 35){ 
+      if((trig_bits[it] & (1<<1)) != 0 && (trig_bits[it] & (1<<3)) != 0 && (trig_bits[it] & (1<<23)) != 0 && trig_id[it] == 15 && trig_pt[it] > 35){ 
         if ( (trig_l1iso[it] > 0 && trig_l1pt[it] >= 32) || trig_l1pt[it] > 70 ) {
           return true;
         }
@@ -720,7 +720,7 @@ bool PassDiTauJetTrig2022(UInt_t ntrig,Vec_t trig_l1pt, Vec_i trig_l1iso, Vec_i 
     float dR = deltaR(trig.Eta(),tau_eta,trig.Phi(),tau_phi);
     if (dR < 0.5){ //dR < 0.5, 1 => Medium, 17 => Monitoring, 18 => MonitoringForVBFIsoTau, bit1 && bit17 && !bit18
       // drop !bit18 cut
-      if((trig_bits[it] & (1<<1)) != 0 && (trig_bits[it] & (1<<18)) != 0 && trig_id[it] == 15){ 
+      if((trig_bits[it] & (1<<1)) != 0 && (trig_bits[it] & (1<<3)) != 0 && (trig_bits[it] & (1<<20)) != 0 && trig_id[it] == 15){ 
         if ( (trig_pt[it] > 30 && trig_l1iso[it] > 0 && trig_l1pt[it] > 26) )  
           return true;
       }
@@ -735,7 +735,7 @@ bool PassSingleTauTrig2022(UInt_t ntrig,Vec_i trig_id,Vec_i trig_bits,Vec_t trig
     const ROOT::Math::PtEtaPhiMVector trig(trig_pt[it],trig_eta[it],trig_phi[it],0);
     float dR = deltaR(trig.Eta(),tau_eta,trig.Phi(),tau_phi);
     if (dR < 0.5){ //dR < 0.5
-      if((trig_bits[it] & 536870912) != 0 && trig_id[it] == 15){ 
+      if((trig_bits[it] & 67108864) != 0 && trig_id[it] == 15){ 
           return true;
       }
     }
