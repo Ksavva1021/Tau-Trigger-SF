@@ -68,45 +68,9 @@ class FitResults:
         eff.y = new_y
         yerr = np.maximum(eff.y_error_low, eff.y_error_high)
 
-        # self.pt_start_flat = eff.x[-1]
-        # best_chi2_ndof = math.inf
-        # for n in range(1, N):
-        #     flat_eff, residuals, _, _, _ = np.polyfit(eff.x[N-n-1:], eff.y[N-n-1:], 0, w=1/yerr[N-n-1:], full=True)
-        #     chi2_ndof = residuals[0] / n
-        #     #print(n, chi2_ndof)
-        #     if (chi2_ndof > 0 and chi2_ndof < best_chi2_ndof) or eff.x[N-n-1] + eff.x_error_high[N-n-1] >= 100:
-        #         self.pt_start_flat = eff.x[N-n-1]
-        #         best_chi2_ndof = chi2_ndof
-        # if best_chi2_ndof > 20:
-        #     print("Unable to determine the high pt region")
-        #     self.pt_start_flat = eff.x[-1]
-
         self.pt_start_flat = eff.x[-1]
         best_chi2_ndof = math.inf
-        # for n in range(2, N):  # require at least 2 points
-        #     start_idx = N - n
-        #     x_fit = eff.x[start_idx:]
-        #     y_fit = eff.y[start_idx:]
-        #     yerr_fit = yerr[start_idx:]
 
-        #     # Force plateau to end value
-        #     flat_val = eff.y[-1]
-        #     residuals = np.sum(((y_fit - flat_val) / yerr_fit) ** 2)
-        #     chi2_ndof = residuals / (len(y_fit) or 1)
-
-        #     # Require that the slope in this region is small
-        #     slope = np.gradient(y_fit, x_fit)
-        #     if np.max(np.abs(slope)) > 1e-5:
-        #         continue
-
-        #     # Penalty to encourage later start for plateau
-        #     pt_penalty = 0.01 * max(0, eff.x[-1] - eff.x[start_idx])
-        #     chi2_penalized = chi2_ndof + pt_penalty
-
-        #     # Accept if it's the best or very late plateau
-        #     if chi2_penalized < best_chi2_ndof or (eff.x[start_idx] + eff.x_error_high[start_idx] >= 100):
-        #         self.pt_start_flat = eff.x[start_idx]
-        #         best_chi2_ndof = chi2_penalized
         for n in range(1, N):
             flat_eff, residuals, _, _, _ = np.polyfit(eff.x[N-n-1:], eff.y[N-n-1:], 0, w=1/yerr[N-n-1:], full=True)
             chi2_ndof = residuals[0] / n
@@ -127,21 +91,38 @@ class FitResults:
                                                n_restarts_optimizer=10)
         self.gp_low.fit(np.atleast_2d(np.append([10], eff.x[low_pt])).T, np.append([0], eff.y[low_pt]))
 
-        self.y_pred, sigma_pred = self.Predict(x_pred)
+        # Start of plateau uncertainty from GP
+        pt0 = self.pt_start_flat
+        _, sigma_high = self.gp_high.predict(np.atleast_2d(pt0).T, return_std=True)
+        sigma_high = float(sigma_high)
+        self._sigma_plateau = sigma_high
 
+        y_raw, sigma_raw = self.Predict(x_pred)
+        # enforce monotonicity: no negative slopes
+        y_pred = np.maximum.accumulate(y_raw)
+        # inflation uncertainty
+        delta = np.abs(y_pred - y_raw)
+        sigma_inflated = np.sqrt(sigma_raw**2 + delta**2)
+
+        self.y_pred = y_pred
+        self.sigma_pred = sigma_inflated
+
+        plateau_mask = x_pred >= self.pt_start_flat
+        if np.any(plateau_mask):
+            self.sigma_pred[plateau_mask] = self._sigma_plateau
         sigma_orig = np.zeros(N)
         for n in range(N):
             idx = np.argmin(abs(x_pred - eff.x[n]))
-            sigma_orig[n] = sigma_pred[idx]
+            sigma_orig[n] = self.sigma_pred[idx]
 
         interp_kind = 'linear'
         sp = interpolate.interp1d(eff.x, sigma_orig, kind=interp_kind, fill_value="extrapolate")
         sigma_interp = sp(x_pred)
         max_unc = 0.05 / math.sqrt(2)
-        sigma_pred, = self.ApplyStep(x_pred, [ [ sigma_pred, sigma_interp ] ], eff.x[0], eff.x[-1] )
+        sigma_step_smoothed, = self.ApplyStep(x_pred, [ [ self.sigma_pred, sigma_interp ] ], eff.x[0], eff.x[-1] )
         outer_trend = np.minimum(np.ones(x_pred.shape[0]), (x_pred - eff.x[-1]) / eff.x[-1])
-        outer_sigma = np.maximum(sigma_pred, sigma_pred + (max_unc - sigma_pred) * outer_trend )
-        self.sigma_pred = np.where(x_pred < eff.x[-1], sigma_pred, outer_sigma )
+        outer_sigma = np.maximum(sigma_step_smoothed, sigma_step_smoothed + (max_unc - sigma_step_smoothed) * outer_trend )
+        self.sigma_pred = np.where(x_pred < eff.x[-1], sigma_step_smoothed, outer_sigma )
 
     def Predict(self, x_pred):
         y_pred_high, sigma_high = self.gp_high.predict(np.atleast_2d(x_pred).T, return_std=True)
@@ -194,132 +175,56 @@ for channel in channels:
                 x_pred = np.arange(x_low, x_high + pred_step / 2, pred_step)
 
 
-                def get_common_bins(graph_data, graph_mc, rel_unc_threshold=0.3, min_width=2.0, max_merge=10):
-                    """
-                    Merge bins from high to low pT. Ensures no empty bins in either data or MC.
-                    Returns final merged bin edges (to use identically for both).
-                    """
-                    def extract_bins(graph):
-                        bins = []
-                        for i in range(graph.GetN()):
-                            x = graph.GetX()[i]
-                            ex_low = graph.GetErrorXlow(i)
-                            ex_high = graph.GetErrorXhigh(i)
-                            y = graph.GetY()[i]
-                            ey = 0.5 * (graph.GetErrorYlow(i) + graph.GetErrorYhigh(i))
-                            rel_unc = ey / y if y > 0 else float('inf')
-                            bins.append({'low': x - ex_low, 'high': x + ex_high, 'rel_unc': rel_unc})
-                        return bins
+                def rebin_mc_to_data(data_graph, mc_graph):
 
-                    bins_data = extract_bins(graph_data)
-                    bins_mc = extract_bins(graph_mc)
-                    combined = sorted(bins_data + bins_mc, key=lambda b: b['low'])
+                    xs, ys, xl, xh, yl, yh = [], [], [], [], [], []
 
-                    # Full sorted unique edges from both
-                    edges = sorted(set([b['low'] for b in combined] + [b['high'] for b in combined]))
-                    
-                    merged_edges = [edges[-1]]
-                    i = len(edges) - 2
-                    while i >= 0:
-                        bin_low = edges[i]
-                        bin_high = merged_edges[0]
-                        merge_count = 0
+                    # Loop one-to-one over data bins:
+                    for i, (center, exl, exh) in enumerate(zip(data_graph.x,
+                                                data_graph.x_error_low,
+                                                data_graph.x_error_high)):
+                        lo, hi = center - exl, center + exh
+                        eps = 1e-6
 
-                        while True:
-                            # Check if bin [bin_low, bin_high] is empty in either graph
-                            empty_data = True
-                            for j in range(graph_data.GetN()):
-                                x = graph_data.GetX()[j]
-                                if bin_low <= x < bin_high:
-                                    empty_data = False
-                                    break
-                            empty_mc = True
-                            for j in range(graph_mc.GetN()):
-                                x = graph_mc.GetX()[j]
-                                if bin_low <= x < bin_high:
-                                    empty_mc = False
-                                    break
+                         # pick MC bins whose intervals overlap [lo, hi)
+                        left_edges  = mc_graph.x - mc_graph.x_error_low
+                        right_edges = mc_graph.x + mc_graph.x_error_high
+                        mask = (left_edges < hi + eps) & (right_edges > lo - eps)
 
-                            # Check combined relative uncertainty
-                            in_data = [b['rel_unc'] for b in bins_data if b['low'] >= bin_low and b['high'] <= bin_high]
-                            in_mc = [b['rel_unc'] for b in bins_mc if b['low'] >= bin_low and b['high'] <= bin_high]
-                            all_uncs = in_data + in_mc
-                            mean_unc = np.mean(all_uncs) if all_uncs else float('inf')
-                            width = bin_high - bin_low
+                        if np.any(mask):
+                            # Weighted average of MC eff in [lo, hi]
+                            y_vals   = mc_graph.y[mask]
+                            errs_low = mc_graph.y_error_low[mask]
+                            errs_hi  = mc_graph.y_error_high[mask]
+                            weights  = 1.0 / ((errs_low + errs_hi) / 2.0)**2
 
-                            # Stop merging if: has data & mc & good uncertainty & width, or max_merge reached
-                            if (not empty_data and not empty_mc and mean_unc < rel_unc_threshold and width >= min_width) or \
-                            merge_count >= max_merge or i == 0:
-                                break
-
-                            # Merge backward
-                            merge_count += 1
-                            i -= 1
-                            bin_low = edges[max(0, i)]
-
-                        merged_edges.insert(0, bin_low)
-                        i -= 1
-
-                    return np.array(merged_edges)
+                            y_mean = np.average(y_vals, weights=weights)
+                            y_err  = np.sqrt(1.0 / weights.sum())
+                        else:
+                            print(f"Warning: no MC points in data bin [{lo}, {hi})")
+                            y_mean, y_err = np.nan, np.nan
 
 
-                # Interpolate both onto common bin centers if needed
-                bin_edges = get_common_bins(eff_data_root, eff_mc_root)
-                bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+                        # Append exactly the data bin center & widths
+                        xs.append(center)
+                        ys.append(y_mean)
+                        xl.append(exl)
+                        xh.append(exh)
+                        yl.append(y_err)
+                        yh.append(y_err)
 
-                def rebin_graph(original_graph, bin_edges):
-                    """
-                    Rebins a Graph into fixed bins defined by bin_edges.
-                    No merging logic — assumes bin_edges are already merged.
-                    """
-                    x_vals = []
-                    y_vals = []
-                    x_err_low = []
-                    x_err_high = []
-                    y_err_low = []
-                    y_err_high = []
-
-                    for i in range(len(bin_edges) - 1):
-                        x_low = bin_edges[i]
-                        x_high = bin_edges[i+1]
-
-                        in_bin = (original_graph.x >= x_low) & (original_graph.x < x_high)
-                        if not np.any(in_bin):
-                            continue
-
-                        x_bin = original_graph.x[in_bin]
-                        y_bin = original_graph.y[in_bin]
-                        y_err_low_bin = original_graph.y_error_low[in_bin]
-                        y_err_high_bin = original_graph.y_error_high[in_bin]
-
-                        weights = 1. / np.maximum(1e-12, (0.5 * (y_err_low_bin + y_err_high_bin)) ** 2)
-                        weighted_avg = np.average(y_bin, weights=weights)
-                        avg_err = np.sqrt(1. / np.sum(weights))
-
-                        center = 0.5 * (x_low + x_high)
-                        width = 0.5 * (x_high - x_low)
-
-                        x_vals.append(center)
-                        y_vals.append(weighted_avg)
-                        x_err_low.append(width)
-                        x_err_high.append(width)
-                        y_err_low.append(avg_err)
-                        y_err_high.append(avg_err)
-
-                    graph_rebinned = ROOT.TGraphAsymmErrors(
-                        len(x_vals),
-                        array('d', x_vals),
-                        array('d', y_vals),
-                        array('d', x_err_low),
-                        array('d', x_err_high),
-                        array('d', y_err_low),
-                        array('d', y_err_high),
+                    # Build the TGraphAsymmErrors from these arrays
+                    tga_mc = ROOT.TGraphAsymmErrors(
+                        len(xs),
+                        array('d', xs), array('d', ys),
+                        array('d', xl), array('d', xh),
+                        array('d', yl), array('d', yh),
                     )
+                    mc_rebinned = Graph(root_graph=tga_mc)
 
-                    return Graph(root_graph=graph_rebinned)
+                    return data_graph, mc_rebinned
 
-                eff_data = rebin_graph(eff_data_orig, bin_edges)
-                eff_mc = rebin_graph(eff_mc_orig, bin_edges)
+                eff_data, eff_mc = rebin_mc_to_data(eff_data_orig, eff_mc_orig)
 
                 eff_data_fitted = FitResults(eff_data, x_pred)
                 eff_mc_fitted = FitResults(eff_mc, x_pred)
