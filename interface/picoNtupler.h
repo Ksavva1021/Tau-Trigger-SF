@@ -753,7 +753,7 @@ bool PassVBFDiTauTrig2022(UInt_t ntrig,Vec_t trig_l1pt, Vec_i trig_l1iso, Vec_i 
     if (dR < 0.5){ //dR < 0.5, 1 => Medium, 17 => Monitoring, 18 => MonitoringForVBFIsoTau, bit1 && bit17 && !bit18
       // drop !bit18 cut
       if((trig_bits[it] & (1<<1)) != 0 && (trig_bits[it] & (1<<3)) != 0 && (trig_bits[it] & (1<<25)) != 0 && trig_id[it] == 15){ 
-        if ( (trig_pt[it] > 20 && trig_l1pt[it] > 22) )  
+        if ( (trig_pt[it] > 20) )  
           return true;
       }
     }
