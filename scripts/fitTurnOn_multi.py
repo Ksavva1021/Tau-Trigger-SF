@@ -1,28 +1,42 @@
+print("Starting script...")
 import argparse
+print("Imported argparse")
 import os
 import sys
+print("Imported os, sys")
 import math
 import numpy as np
+print("Imported math, numpy")
 import matplotlib
 matplotlib.use('Agg')
+print("Set matplotlib backend to Agg")
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.ticker as ticker
+print("Imported matplotlib components")
+import mplhep as hep
+print("Imported mplhep")
 import scipy
 import copy
 from scipy import interpolate
 from scipy.ndimage import gaussian_filter1d
+print("Imported scipy components")
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern, ConstantKernel
+print("Imported sklearn components")
 
 import ROOT
 ROOT.gROOT.SetBatch(True)
 ROOT.TH1.SetDefaultSumw2()
+print("Imported and configured ROOT")
 
 sys.path.insert(0, 'Common/python')
 from RootObjects import Histogram, Graph
+print("Imported custom RootObjects")
 
 from array import array
+print("Imported array")
 
 # --------------
 # Example Command:
@@ -31,21 +45,39 @@ from array import array
 # python3 scripts/fitTurnOn_multi.py --input TurnOnPNet/TurnOnPNet.root --output fitTurnOnPNet --decay_modes PNet
 # --------------
 
+print("About to parse arguments...")
+
 
 parser = argparse.ArgumentParser(description='Fit turn-on curves.')
 parser.add_argument('--input', required=True, type=str, help="ROOT file with turn-on curves")
 parser.add_argument('--output', required=True, type=str, help="output file prefix")
-parser.add_argument('--channels', required=False, type=str, default='etau,mutau,ditau,ditaujet', help="channels to process")
+parser.add_argument('--channels', required=False, type=str, default='etau,mutau,ditau,ditaujet,vbftau,vbfditau,mutau_l1', help="channels to process")
 parser.add_argument('--decay-modes', required=False, type=str, default='all,0,1,2,10,11', help="decay modes to process")
 parser.add_argument('--decay_modes', required=True, type=str, default='DeepTau', choices=['DeepTau', 'PNet'], help="Type of decay modes to process")
 parser.add_argument('--working-points', required=False, type=str,
                     default='VVVLoose,VVLoose,VLoose,Loose,Medium,Tight,VTight,VVTight',
                     help="working points to process")
+
 args = parser.parse_args()
+
+path_dict = {
+    "mutau": r"$\mathrm{\mu\tau_{h}}$",
+    "etau": r"$\mathrm{e\tau_{h}}$",
+    "ditau": r"$\mathrm{Di-\tau_{h}}$",
+    "ditaujet": r"$\mathrm{Di-\tau_{h} + jet}$",
+    "vbftau": r"$\mathrm{VBF + \tau_{h}}$",
+    "vbfditau": r"$\mathrm{VBF + Di-\tau_{h}}$",
+    "mutau_l1": r"$\mathrm{\mu\tau_{h}}$ (L1 only)",
+    "etau_l1": r"$\mathrm{e\tau_{h}}$ (L1 only)",
+    "ditau_l1": r"$\mathrm{Di-\tau_{h}}$ (L1 only)",
+    "ditaujet_l1": r"$\mathrm{Di-\tau_{h} + jet}$ (L1 only)",
+    "vbftau_l1": r"$\mathrm{VBF + \tau_{h}}$ (L1 only)",
+    "vbfditau_l1": r"$\mathrm{VBF + Di-\tau_{h}}$ (L1 only)",
+}
 
 def MinTarget(dy, eff):
     y = np.cumsum(dy)
-    return np.sum(((eff.y - y) / (eff.y_error_high + eff.y_error_low)) ** 2)
+    return np.sum(((eff.y - y) / (eff.y_error_high + eff.y_error_low + 1e-6)) ** 2)
 
 class FitResults:
     def __init__(self, eff, x_pred):
@@ -54,6 +86,11 @@ class FitResults:
         N = eff.x.shape[0]
         dy_init = np.gradient(eff.y, eff.x)
         dy_init = np.clip(dy_init, 0, 1)
+        # print("dy_init:", dy_init)
+        # print("eff.y:", eff.y)
+        # print("eff.y_error_low:", eff.y_error_low)
+        # print("eff.y_error_high:", eff.y_error_high)
+        # print("Bounds:", [ [0, 1] ] * N)
         res = scipy.optimize.minimize(MinTarget, dy_init, args=(eff,), bounds = [ [0, 1] ] * N,
                                       options={"maxfun": int(1e6)})
         if not res.success:
@@ -61,7 +98,11 @@ class FitResults:
             raise RuntimeError("Unable to prefit")
 
         eff = copy.deepcopy(eff)
+        orig_y = eff.y.copy() # save original y values
         new_y = np.cumsum(res.x)
+        # # --- PIN THE TAIL (minimal) ---
+        # K = min(1, len(new_y))            # pin last 2 points; tune to 2–3 if needed
+        # new_y[-K:] = orig_y[-K:]          # keep tail equal to the measured points
         delta = eff.y - new_y
         eff.y_error_low = np.sqrt(eff.y_error_low ** 2 + delta ** 2)
         eff.y_error_high = np.sqrt(eff.y_error_high ** 2 + delta ** 2)
@@ -72,10 +113,17 @@ class FitResults:
         best_chi2_ndof = math.inf
 
         for n in range(1, N):
-            flat_eff, residuals, _, _, _ = np.polyfit(eff.x[N-n-1:], eff.y[N-n-1:], 0, w=1/yerr[N-n-1:], full=True)
-            chi2_ndof = residuals[0] / n
+            err_tail = np.maximum(yerr[N-n-1:], 0.03)
+            flat_eff, residuals, _, _, _ = np.polyfit(eff.x[N-n-1:], eff.y[N-n-1:], 0, w=1/err_tail, full=True)
+            chi2_ndof = residuals[0] / n if residuals.size else math.inf
             #print(n, chi2_ndof)
-            if (chi2_ndof > 0 and chi2_ndof < best_chi2_ndof) or eff.x[N-n-1] + eff.x_error_high[N-n-1] >= 100:
+            # DEBUG Print
+            print(
+                f"n={n:2d} | start_x={eff.x[N-n-1]:6.2f} GeV | pts={len(eff.x[N-n-1:])} | "
+                f"chi2/ndof={chi2_ndof:8.3f} | flat_eff={float(flat_eff):6.3f} | "
+            )
+            if (chi2_ndof > 0 and chi2_ndof < best_chi2_ndof) or (
+        eff.x[N-n-1] + eff.x_error_high[N-n-1] >= 100 and chi2_ndof < 10):
                 self.pt_start_flat = eff.x[N-n-1]
                 best_chi2_ndof = chi2_ndof
         if best_chi2_ndof > 20:
@@ -142,13 +190,28 @@ class FitResults:
 
 channels = args.channels.split(',')
 if args.decay_modes == 'PNet':
-    decay_modes = [ 'all', '0', '1', '2', '10', '11', '1011']
+    decay_modes = [ 'all', 'all', '0', '1', '2', '10', '11', '1011']
 elif args.decay_modes == 'DeepTau':
-    decay_modes = [ 'all', '0', '1', '10', '11', '1011']
+    decay_modes = [ 'all', 'all', '0', '1', '01', '10', '11', '1011']
 working_points = args.working_points.split(',')
-ch_validity_thrs = { 'etau': 35, 'mutau': 32, 'ditau': 40, 'ditaujet': 40, }
+ch_validity_thrs = { 'etau': 35, 'mutau': 32, 'ditau': 40, 'ditaujet': 35, 'vbftau': 50, 'vbfditau': 25, 'mutau_l1': 32, 'etau_l1': 35, 'ditau_l1': 40, 'ditaujet_l1': 35, 'vbftau_l1': 50, 'vbfditau_l1': 25 }
 
 file = ROOT.TFile(args.input, 'READ')
+if "Run3_combined" in args.input:
+    lumi_label = 61.9
+if "Run3_2022_combined" in args.input:
+    lumi_label = 34.7
+elif "Run3_2022EE" in args.input:
+    lumi_label = 26.7
+elif "Run3_2023_combined" in args.input:
+    lumi_label = 27.8
+elif "Run3_2023BPix" in args.input:
+    lumi_label = 9.7
+elif "Run3_2023" in args.input:
+    lumi_label = 18.1
+elif "Run3_2022" in args.input:
+    lumi_label = 8.0
+
 output_dir = os.path.join(os.getcwd(), args.output)
 os.makedirs(output_dir, exist_ok=True)
 
@@ -166,12 +229,20 @@ for channel in channels:
                 dm_label = '_dm'+ dm if len(dm) > 0 else ''
                 eff_data_root = file.Get(name_pattern.format('data'))
                 eff_mc_root = file.Get(name_pattern.format('mc'))
+                if not eff_data_root or not eff_mc_root:
+                    print(f"Error: Could not find graphs for {channel}, {wp}, DM={dm}")
+                    continue
+                print(eff_data_root.IsA().GetName())
                 eff_data_orig = Graph(root_graph=eff_data_root)
                 eff_mc_orig = Graph(root_graph=eff_mc_root)
                 pred_step = 0.1
                 #x_low = min(eff_data.x[0] - eff_data.x_error_low[0], eff_mc.x[0] - eff_mc.x_error_low[0])
                 #x_high = max(eff_data.x[-1] + eff_data.x_error_high[-1], eff_mc.x[-1] + eff_mc.x_error_high[-1])
-                x_low, x_high = 20, 1000
+                if channel == "vbfditau":
+                    x_low, x_high = 10, 1000
+                else:
+                    x_low, x_high = 20, 1000
+
                 x_pred = np.arange(x_low, x_high + pred_step / 2, pred_step)
 
 
@@ -224,7 +295,15 @@ for channel in channels:
 
                     return data_graph, mc_rebinned
 
+                print("Rebinning MC to data...")
+                print("Data x: {}, y: {}".format(eff_data_orig.x, eff_data_orig.y))
+                print("MC x: {}, y: {}".format(eff_mc_orig.x, eff_mc_orig.y))
                 eff_data, eff_mc = rebin_mc_to_data(eff_data_orig, eff_mc_orig)
+                #eff_data, eff_mc = eff_data_orig, eff_mc_orig
+                print("Rebinned MC x: {}, y: {}".format(eff_mc.x, eff_mc.y))
+                if len(eff_data.x) <= 2:
+                    print("Warning: Insufficient points for fitting. Using linear interpolation.")
+                    continue
 
                 eff_data_fitted = FitResults(eff_data, x_pred)
                 eff_mc_fitted = FitResults(eff_mc, x_pred)
@@ -238,6 +317,8 @@ for channel in channels:
                 mc_color = 'g'
                 data_color = 'k'
                 trans = 0.3
+                hep.style.use("CMS")
+                hep.cms.label(label="", ax=ax, loc=0, fontsize=20, data=True, com=13.6, lumi=lumi_label)
 
                 # test by botao
                 # print("mc low previous: {}".format(eff_mc.x_error_low))
@@ -293,23 +374,56 @@ for channel in channels:
                     title += " for DM={}".format(dm)
                 else:
                     title += " for all DMs"
-                ax.set_title(title, fontsize=16)
-                ax.set_ylabel("Efficiency", fontsize=12)
+                #ax.set_title(title, fontsize=16)
+                if dm != 'all':
+                    # extra_text = "{0} trigger\n{1} WP TauID\n DM={2}".format(path_dict[channel], wp, dm)
+                    extra_text = "{0} trigger\n{1} WP \nDeepTau ID\n DM={2}".format(path_dict[channel], wp, dm)
+                else:
+                    # extra_text = "{0} trigger\n{1} WP TauID".format(path_dict[channel], wp)
+                    extra_text = "{0} trigger\n{1} WP \nDeepTau ID".format(path_dict[channel], wp)
+                ax.text(
+                    0.30, 0.20,
+                    extra_text,
+                    transform=ax.transAxes,  # Use axis-relative coordinates
+                    fontsize=18,  # Font size for the text
+                    verticalalignment='center',  # Align text vertically
+                    horizontalalignment='center',  # Align text horizontally
+                    # bbox=dict(boxstyle="round", facecolor="white", alpha=0.5),  # Optional: Add a box
+                )
+
+                ax.set_ylabel("L1+HLT efficiency", fontsize=20, loc='top')
                 ax.set_ylim([ 0., 1.1 ])
                 ax.set_xlim([ 20, min(200, plt.xlim()[1]) ])
+                # ax.yaxis.set_major_locator(ticker.MultipleLocator(0.2))
+                # ax.xaxis.set_major_locator(ticker.MultipleLocator(20))
 
-                ax_ratio.set_xlabel("$p_T$ (GeV)", fontsize=12)
-                ax_ratio.set_ylabel("Data/MC SF", fontsize=12)
+                ax.get_xaxis().tick_bottom()
+                ax.get_yaxis().set_ticks_position('left')
+                ax_ratio.get_xaxis().set_ticks_position('bottom')
+                ax_ratio.get_yaxis().set_ticks_position('left')
+                
+                ax.tick_params(axis='both', labelsize=20)  # Change font size for both x and y axes
+                ax.grid(True, which="major", linestyle="--", linewidth=0.5, alpha=0.7, color="black")
+
+                ax_ratio.xaxis.set_label_position('bottom')
+                ax_ratio.set_ylabel("Data/MC SF", fontsize=20)
                 ax_ratio.set_ylim([0.5, 1.49])
+                # ax_ratio.yaxis.set_major_locator(ticker.MultipleLocator(0.2))
+                ax_ratio.tick_params(axis='both', labelsize=20)  # Change font size for both x and y axes
+                ax_ratio.set_yticks([0.6, 0.8, 1.0, 1.2, 1.4])
+
+                # Move x-label to the right side
+                ax_ratio.set_xlabel(r"Offline $\mathrm{\tau_h}\,p_T$ [GeV]", fontsize=20, loc='right')
 
                 validity_plt = ax.plot( [ ch_validity_thrs[channel] ] * 2, ax.get_ylim(), 'r--' )
                 ax_ratio.plot( [ ch_validity_thrs[channel] ] * 2, ax_ratio.get_ylim(), 'r--' )
 
-                ax.legend([ plt_data, plt_mc, plt_data_fitted[0], plt_mc_fitted[0], validity_plt[0] ],
-                          [ "Data", "MC", "Data fitted", "MC fitted", "Validity range"], fontsize=12, loc='lower right')
+                ax.legend([plt_data, plt_mc, plt_data_fitted[0], plt_mc_fitted[0], validity_plt[0]],
+                          ["Data", "MC", "Data fitted", "MC fitted", "Validity range"],
+                          fontsize=20, loc='lower right', framealpha=0.0)
 
 
-                plt.subplots_adjust(hspace=0)
+                plt.subplots_adjust(hspace=0.05)
                 pdf.savefig(bbox_inches='tight')
                 plt.close()
 
@@ -325,6 +439,92 @@ for channel in channels:
                 output_file.WriteTObject(eff_data_fitted_hist, out_name_pattern.format('data', 'fitted'), 'Overwrite')
                 output_file.WriteTObject(eff_mc_fitted_hist, out_name_pattern.format('mc', 'fitted'), 'Overwrite')
                 output_file.WriteTObject(sf_fitted_hist, out_name_pattern.format('sf', 'fitted'), 'Overwrite')
+
+print(f"Wrote fitted curves PDF to {output_file_path}_{channel}.pdf")
+
+# ------------------------------------------------------------
+# Overlaid SF plots per DM at Medium WP for mutau/ditau/ditaujet
+# ------------------------------------------------------------
+def compute_sf_for(channel, wp, dm):
+    dm_label = f"_dm{dm}" if dm != "all" else ""
+    name_pattern = f"{{}}_{channel}_{wp}{dm_label}_fit_eff"
+
+    eff_data_root = file.Get(name_pattern.format('data'))
+    eff_mc_root   = file.Get(name_pattern.format('mc'))
+    if not eff_data_root or not eff_mc_root:
+        raise RuntimeError(f"Missing graphs for {channel}, {wp}, DM={dm}")
+
+    data_g = Graph(root_graph=eff_data_root)
+    mc_g   = Graph(root_graph=eff_mc_root)
+
+    # common x-range for these three channels
+    x_low, x_high = 20, 1000
+    pred_step = 0.1
+    x_pred = np.arange(x_low, x_high + pred_step/2, pred_step)
+
+    # Rebin MC to the data binning
+    data_g, mc_g = rebin_mc_to_data(data_g, mc_g)
+
+    # Fit
+    data_fit = FitResults(data_g, x_pred)
+    mc_fit   = FitResults(mc_g, x_pred)
+
+    # SF and uncertainty
+    sf = data_fit.y_pred / mc_fit.y_pred
+    sf_sigma = np.sqrt(
+        (data_fit.sigma_pred / mc_fit.y_pred)**2 +
+        (data_fit.y_pred * mc_fit.sigma_pred / (mc_fit.y_pred**2))**2
+    )
+    return x_pred, sf, sf_sigma
+
+medium_wp = "Medium"
+channels_to_plot = ["mutau", "ditau", "ditaujet"]
+chan_style = {
+    "mutau":    {"ls": "-",  "label": "mutau"},
+    "ditau":    {"ls": "--", "label": "ditau"},
+    "ditaujet": {"ls": ":",  "label": "ditaujet"},
+}
+
+with PdfPages(f"{output_file_path}_SF_{medium_wp}_byDM.pdf") as pdf:
+    for dm in decay_modes:
+        fig, ax = plt.subplots(figsize=(7, 4.5))
+
+        # draw each channel
+        for ch in channels_to_plot:
+            try:
+                x_pred, sf, sf_sigma = compute_sf_for(ch, medium_wp, dm)
+            except Exception as e:
+                print(f"[warn] {ch}, DM={dm}: {e}")
+                continue
+
+            # line + band
+            ax.plot(x_pred, sf, linestyle=chan_style[ch]["ls"])
+            ax.fill(
+                np.concatenate([x_pred, x_pred[::-1]]),
+                np.concatenate([sf - sf_sigma, (sf + sf_sigma)[::-1]]),
+                alpha=0.25
+            )
+
+        # validity markers (one per channel)
+        ylo, yhi = 0.5, 1.49
+        for ch in channels_to_plot:
+            if ch in ch_validity_thrs:
+                thr = ch_validity_thrs[ch]
+                ax.plot([thr, thr], [ylo, yhi], 'r--', linewidth=1)
+
+        title = f"Data/MC SF at {medium_wp} WP — DM={dm}"
+        ax.set_title(title, fontsize=14)
+        ax.set_xlabel(r"Offline $\mathrm{\tau_h}\,p_T$ [GeV]", fontsize=12, loc='right')
+        ax.set_ylabel("SF", fontsize=12)
+        ax.set_ylim([ylo, yhi])
+        ax.set_xlim([20, 200])
+        ax.legend([chan_style[c]["label"] for c in channels_to_plot] + ["Validity thresholds"],
+                loc="lower right", fontsize=10)
+
+        pdf.savefig(bbox_inches="tight")
+        plt.close(fig)
+
+print(f"Wrote overlaid SF PDF to {output_file_path}_SF_{medium_wp}_byDM.pdf")
 
 output_file.Close()
 print('All done.')
