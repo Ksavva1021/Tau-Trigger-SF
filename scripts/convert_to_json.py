@@ -18,6 +18,7 @@ from correctionlib.schemav2 import (
 
 # ------------------
 # Example Command:
+# pip install correctionlib==2.5.0
 # python3 scripts/convert_to_json.py --years 2022preEE 2022postEE 2023preBPix 2023postBPix --outdir jsons
 # ------------------
 
@@ -87,7 +88,7 @@ year_dict = {
   '2023postBPix' : '2023postBPix',
 }
 
-if DeepTauV2p5: in_file_name = lambda year : f"jsons/fitTurnOn_{year_dict[year]}.root"
+if DeepTauV2p5: in_file_name = lambda year : f"jsons_PNet_NLO/fitTurnOn_{year_dict[year]}.root"
 else: in_file_name = lambda year : 'data/tau/'+year_dict[year]+'_tauTriggerEff_DeepTau2017v2p1.root'
 in_hist_name = lambda corrtype, typ, wp, dm_str : '_'.join([corrtype,typ,wp,dm_str,'fitted'])
 
@@ -240,7 +241,7 @@ def convert_trigger(corrs, year, **kwargs):
                     "Ditauvbf trigger SF is only available for 2017 and 2018. To get the usual DM-specific SF's, "+\
                     "specify the DM, otherwise set DM to -1 to get the inclusive SFs. " +\
                     "Default corrections are set to SF's, if you require the input efficiencies, you can specify so in " +\
-                    "the corrtype input variable" +\
+                    "the corrtype input variable. These tau Trigger SFs are derived using amcatNLO DY samples." +\
                     "Note: These SFs are specific for the Htautau CP Analysis (IP significance cuts for DM0 and requiring a refitted SV for DMs 10 & 11)",
     'inputs': [
       {'name': "pt",       'type': "real",   'description': "tau pt"},
@@ -277,10 +278,14 @@ def convert_trigger(corrs, year, **kwargs):
       ]
     } #category:trigtype
   })
+  corrs.append(corr)
+  cset = CorrectionSet.parse_obj({
+    "schema_version": 2,
+    "corrections": corrs
+})
   print(f">>> Writing {fname}...")
   with open(fname,'w') as fout:
-    JSONEncoder.write(corr,fname,maxlistlen=20)
-  corrs.append(corr)
+    JSONEncoder.write(cset,fname,maxlistlen=20)
 
 def evaluate(corrs):
 

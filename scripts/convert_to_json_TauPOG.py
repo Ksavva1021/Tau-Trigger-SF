@@ -5,6 +5,7 @@ from utils import *
 import uproot
 import os, ROOT
 import numpy
+import correctionlib
 
 from correctionlib.schemav2 import (
     VERSION,
@@ -15,11 +16,23 @@ from correctionlib.schemav2 import (
     Formula,
     Transform
 )
+# Ensure correctionlib==2.6.1 is installed
+required_version = "2.6.1"
+try:
+    import correctionlib
+    if correctionlib.__version__ != required_version:
+        print(f"Updating correctionlib to version {required_version}...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", f"correctionlib=={required_version}"])
+        import correctionlib  # Re-import after installation
+except ImportError:
+    print(f"Installing correctionlib version {required_version}...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", f"correctionlib=={required_version}"])
+    import correctionlib  # Import after installation
 
-# ------------------
+print("correctionlib version:", correctionlib.__version__)# ------------------
 # Example Command:
 # pip install correctionlib==2.5.0
-# python3 scripts/convert_to_json.py --years 2022preEE 2022postEE 2023preBPix 2023postBPix --outdir jsons
+# python3 scripts/convert_to_json_TauPOG.py --years 2022preEE 2022postEE 2023preBPix 2023postBPix --outdir jsons
 # ------------------
 
 DeepTauV2p5=True
@@ -41,15 +54,26 @@ trigtypes = {
     '2018_UL' : ['ditau', 'etau', 'mutau'],
     '2016postVFP_UL' : ['ditau', 'etau', 'mutau'],
     '2016preVFP_UL' : ['ditau', 'etau', 'mutau'],
-    '2022preEE' : ['ditau', 'etau', 'mutau', 'ditaujet'],
-    '2022postEE' : ['ditau', 'etau', 'mutau', 'ditaujet'],
-    '2023preBPix' : ['ditau', 'etau', 'mutau', 'ditaujet'],
-    '2023postBPix' : ['ditau', 'etau', 'mutau', 'ditaujet'],
+    '2022preEE' : ['ditau', 'etau', 'mutau', 'ditaujet', 'vbftau', 'vbfditau'],
+    '2022postEE' : ['ditau', 'etau', 'mutau', 'ditaujet', 'vbftau', 'vbfditau'],
+    '2023preBPix' : ['ditau', 'etau', 'mutau', 'ditaujet', 'vbftau', 'vbfditau'],
+    '2023postBPix' : ['ditau', 'etau', 'mutau', 'ditaujet', 'vbftau', 'vbfditau'],
 }
 
-types_with_mergeddm = ['ditauvbf']
+# Define which trigger types use merged DM bins for each era
+types_with_mergeddm = {
+  '2023preBPix': ['ditau', 'etau', 'mutau', 'ditaujet'],
+  # Add other eras and their corresponding trigger types as needed
+  # Example:
+  # '2017_UL': ['ditau'],
+  # '2018_UL': [],
+}
+
+def is_merged_dm(year, trigtype):
+  return trigtype in types_with_mergeddm.get(year, [])
+
 dms_nonmerged = [-1, 0, 1, 10, 11]
-dms_merged = [-1, 0, 1, 10]
+dms_merged = [-1, 0, 1, 11]
 
 dm_dict_nonmerged = {
   -1: 'dmall',
@@ -62,8 +86,8 @@ dm_dict_merged = {
   -1: 'dmall',
   0 : 'dm0',
   1 : 'dm1',
-  10 : 'dm1011',
-  11 : 'dm1011'
+  10 : 'dm11',
+  11 : 'dm11'
 }
 
 corrtype_dict = {
@@ -86,9 +110,27 @@ year_dict = {
   '2023postBPix' : '2023postBPix',
 }
 
-if DeepTauV2p5: in_file_name = lambda year : f"jsons_DeepTau_NLO/fitTurnOn_{year_dict[year]}.root"
-else: in_file_name = lambda year : 'data/tau/'+year_dict[year]+'_tauTriggerEff_DeepTau2017v2p1.root'
-in_hist_name = lambda corrtype, typ, wp, dm_str : '_'.join([corrtype,typ,wp,dm_str,'fitted'])
+if DeepTauV2p5:
+  in_file_name = lambda year : f"jsons/fitTurnOnDeepTau_{year_dict[year]}.root"
+else:
+  in_file_name = lambda year : 'data/tau/'+year_dict[year]+'_tauTriggerEff_DeepTau2017v2p1.root'
+
+# Helper that can return a different input file depending on the trigger type.
+# By default it returns `in_file_name(year)`. Special-case `etau` or add
+# more branches here if you need different files per trigger type.
+def in_file_name_by_type(year, trigtype):
+  base = in_file_name(year)
+  # Example special-case: use a separate file for etau corrections if present
+  if trigtype == 'etau':
+    base = f'forLucas/fitTurnOn_ETau_{year_dict[year]}.root'
+  return base
+def in_hist_name(corrtype, typ, wp, dm_str):
+  # typ is the trigger type (e.g. 'etau', 'ditau', ...)
+  # The ETau files use a different token in the histogram name ('DeepTau_ETau'),
+  # so special-case it here; otherwise keep the default naming.
+  if typ == 'etau':
+    return '_'.join([corrtype, 'DeepTau_ETau', wp, dm_str, 'fitted'])
+  return '_'.join([corrtype, typ, wp, dm_str, 'fitted'])
 
 # Helper function to merge bins that have similar values
 def merge_pt_bins(edges, values, errors, pt_threshold = 20.):
@@ -149,7 +191,7 @@ def build_pts(in_file, hist_name, pt_threshold = 20.):
     'down' : [round(val-err, 8) for val, err in zip(tmp_values, tmp_errors)]
   }
 
-  edges[-1] = float('inf')
+  edges[-1] = '+inf'
   return Category.parse_obj(
     {
       "nodetype": "category",
@@ -171,7 +213,7 @@ def build_pts(in_file, hist_name, pt_threshold = 20.):
 def build_dms(trigtype, wp, year, corrtype):
   print('Filling {0} {1} trigger for {2} WP'.format(year, trigtype, wp))
 
-  if not trigtype in types_with_mergeddm:
+  if not is_merged_dm(year, trigtype):
     return Category.parse_obj(
       {
         'nodetype': 'category',
@@ -180,7 +222,7 @@ def build_dms(trigtype, wp, year, corrtype):
         'content': [
           { 'key': dm,
             'value': 
-              build_pts(in_file_name(year), in_hist_name(corrtype_dict[corrtype],trigtype,wp,dm_dict_nonmerged[dm]), pt_threshold=getPtThreshold(trigtype))
+              build_pts(in_file_name_by_type(year, trigtype), in_hist_name(corrtype_dict[corrtype],trigtype,wp,dm_dict_nonmerged[dm]), pt_threshold=getPtThreshold(trigtype))
           } for dm in dms_nonmerged
         ]
       }
@@ -197,8 +239,8 @@ def build_dms(trigtype, wp, year, corrtype):
             { 'key':  -1, 'value':  -1 },
             { 'key':  0, 'value':  0 },
             { 'key':  1, 'value':  1 },
-            { 'key': 10, 'value': 10 },
-            { 'key': 11, 'value': 10 }, # map 11 -> 10
+            { 'key': 10, 'value': 11 }, # map 10 -> 11
+            { 'key': 11, 'value': 11 },
           ] # key:dm
         }, # category:dm          
         'content': {
@@ -208,7 +250,7 @@ def build_dms(trigtype, wp, year, corrtype):
           'content' : [
             { 'key': dm,
               'value': 
-                build_pts(in_file_name(year), in_hist_name(corrtype_dict[corrtype],trigtype,wp,dm_dict_merged[dm]))
+                build_pts(in_file_name_by_type(year, trigtype), in_hist_name(corrtype_dict[corrtype],trigtype,wp,dm_dict_merged[dm]))
             } for dm in dms_merged
           ]
         }
@@ -234,7 +276,7 @@ def convert_trigger(corrs, year, **kwargs):
   corr    = Correction.parse_obj({
     'version': 1,
     'name':    "tauTriggerSF",
-    'description' : "Tau Trigger SFs and efficiencies for {0} ditau, etau, mutau or triggers. " +\
+    'description' : "Tau Trigger SFs and efficiencies for {0} ditau, etau, mutau, ditaujet, vbftau, vbfditau or triggers. " +\
                     "Ditauvbf trigger SF is only available for 2017 and 2018. To get the usual DM-specific SF's, "+\
                     "specify the DM, otherwise set DM to -1 to get the inclusive SFs. " +\
                     "Default corrections are set to SF's, if you require the input efficiencies, you can specify so in " +\
@@ -242,7 +284,7 @@ def convert_trigger(corrs, year, **kwargs):
     'inputs': [
       {'name': "pt",       'type': "real",   'description': "tau pt"},
       {'name': "dm",       'type': "int",    'description': "tau HPS decay mode (0, 1, 10, or 11, -1)"},
-      {'name': "trigtype",       'type': "string",    'description': "Type of trigger: 'ditau', 'etau', 'mutau', 'ditaujet'"},
+      {'name': "trigtype",       'type': "string",    'description': "Type of trigger: 'ditau', 'etau', 'mutau', 'ditaujet', 'vbftau', 'vbfditau'"},
       {'name': "wp",       'type': "string", 'description': "DeepTauVSjet WP: VVVLoose-VVTight"},
       {'name': "corrtype",       'type': "string",    'description': "Type of information: 'eff_data', 'eff_mc', 'sf'"},
       {'name': "syst",     'type': "string", 'description': "systematic 'nom', 'up', 'down'"},
@@ -336,7 +378,7 @@ def makeRootFiles(corrs, year, **kwargs):
           for tt in trigger_types:
             print('Building histogram')
             f = uproot.open(in_file_name(year))
-            if tt in types_with_mergeddm:
+            if is_merged_dm(year, tt):
               hist = f[in_hist_name(corrtype_dict[corrtype], tt, wp, dm_dict_merged[dm])]
             else:
               hist = f[in_hist_name(corrtype_dict[corrtype], tt, wp, dm_dict_nonmerged[dm])]
@@ -396,7 +438,7 @@ if __name__ == '__main__':
   argParser.add_argument('--workingpoints',   action='store', nargs='*', default = None, help='Select offline working points to convert', 
                             choices=['VVVLoose', 'VVLoose', 'VLoose', 'Loose', 'Medium', 'Tight', 'VTight', 'VVTight'])
   argParser.add_argument('--triggertypes',   action='store', nargs='*', default = None, help='Select trigger types to convert', 
-                            choices=['ditau', 'etau', 'mutau','ditaujet'])
+                            choices=['ditau', 'etau', 'mutau','ditaujet', 'vbftau', 'vbfditau'])
   argParser.add_argument('--correctiontypes',   action='store', nargs='*', default = None, help='Select correction types to convert', 
                             choices=['sf', 'eff_mc', 'eff_data'])
   argParser.add_argument('--outdir',   action='store', default = None, help='Select directory to store output')
