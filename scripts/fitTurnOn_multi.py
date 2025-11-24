@@ -318,7 +318,7 @@ for channel in channels:
                 data_color = 'k'
                 trans = 0.3
                 hep.style.use("CMS")
-                hep.cms.label(label="", ax=ax, loc=0, fontsize=20, data=True, com=13.6, lumi=lumi_label)
+                hep.cms.label(label="Preliminary", ax=ax, loc=0, fontsize=20, data=True, com=13.6, lumi=lumi_label)
 
                 # test by botao
                 # print("mc low previous: {}".format(eff_mc.x_error_low))
@@ -391,7 +391,7 @@ for channel in channels:
                     # bbox=dict(boxstyle="round", facecolor="white", alpha=0.5),  # Optional: Add a box
                 )
 
-                ax.set_ylabel("L1+HLT efficiency", fontsize=20, loc='top')
+                ax.set_ylabel("L1+HLT Efficiency", fontsize=20, loc='top')
                 ax.set_ylim([ 0., 1.1 ])
                 ax.set_xlim([ 20, min(200, plt.xlim()[1]) ])
                 # ax.yaxis.set_major_locator(ticker.MultipleLocator(0.2))
@@ -408,6 +408,9 @@ for channel in channels:
                 ax_ratio.xaxis.set_label_position('bottom')
                 ax_ratio.set_ylabel("Data/MC SF", fontsize=20)
                 ax_ratio.set_ylim([0.5, 1.49])
+                ax_ratio.axhline(
+                    1.0, xmin=0, xmax=1, color='orange', linestyle='--'
+                )
                 # ax_ratio.yaxis.set_major_locator(ticker.MultipleLocator(0.2))
                 ax_ratio.tick_params(axis='both', labelsize=20)  # Change font size for both x and y axes
                 ax_ratio.set_yticks([0.6, 0.8, 1.0, 1.2, 1.4])
