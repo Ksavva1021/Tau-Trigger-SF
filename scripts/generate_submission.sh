@@ -12,8 +12,8 @@
 # done
 
 # ------------------
-# Generate sub files: bash generate_submission.sh --year 2023BPix --data_type Muon1_v1
-# Submit all sub files: find submissions -name "*.sub" | xargs -I {} condor_submit {}
+# Generate sub files: bash scripts/generate_submission.sh --year 2023BPix --data_type dy*
+# Submit all sub files: find submissions -name "*.sub" | xargs -I {} condor_submit {} -spool
 
 # Default values
 year=""
@@ -35,8 +35,17 @@ if [[ -z "$year" || -z "$data_type" ]]; then
     exit 1
 fi
 
+# Handle wildcard for data_type
+if [[ "$data_type" == *"*"* ]]; then
+    for expanded_data_type in $(ls Run3_${year}/${data_type}.txt | xargs -n 1 basename -s .txt); do
+        echo "Processing data_type: $expanded_data_type"
+        bash "$0" --year "$year" --data_type "$expanded_data_type"
+    done
+    exit 0
+fi
+
 # Determine isMC based on data_type
-if [ "$data_type" = "dy" ]; then
+if [[ "$data_type" =~ ^dy ]]; then
     isMC=1
 else
     isMC=0
@@ -45,15 +54,24 @@ fi
 # Create the submissions directory if it doesn't exist
 mkdir -p submissions/Run3_${year}
 mkdir -p logs/Run3_${year}/${data_type}
-mkdir -p /eos/cms/store/group/phys_tau/ksavva/TauTrgSF/Run3_${year}/${data_type}
+mkdir -p /eos/cms/store/group/phys_tau/irandreo/TauTrgSF/Run3_${year}/${data_type}
 
 # Generate the submission file
 cat <<EOF > submissions/Run3_${year}/job_submission_${data_type}.sub
 executable              = scripts/run_job.sh
-arguments               = --input \$(inputFile) --output /eos/cms/store/group/phys_tau/ksavva/TauTrgSF/Run3_${year}/${data_type}/ --isMC ${isMC} --era ${year}
+arguments               = --input \$(inputFile) --output /eos/cms/store/group/phys_tau/irandreo/TauTrgSF/Run3_${year}/${data_type}/ --isMC ${isMC} --era ${year}
 log                     = logs/Run3_${year}/${data_type}/\$(ProcId).log
 error                   = logs/Run3_${year}/${data_type}/\$(ProcId).err
 output                  = logs/Run3_${year}/${data_type}/\$(ProcId).out
+
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+
+# Specify files to transfer
+transfer_output_files   = _condor_stdout, _condor_stderr
+transfer_output_remaps  = "_condor_stdout=/eos/user/i/irandreo/TauTrgSF/PhysicsTools/Tau-Trigger-SF/logs/Run3_${year}/${data_type}/\$(ProcId).out, _condor_stderr=/eos/user/i/irandreo/TauTrgSF/PhysicsTools/Tau-Trigger-SF/logs/Run3_${year}/${data_type}/\$(ProcId).err"
+
+request_memory = 8GB
 
 # Job runtime flavor
 +JobFlavour             = "longlunch"
