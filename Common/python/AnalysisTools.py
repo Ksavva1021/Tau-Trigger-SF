@@ -188,7 +188,7 @@ def _mc_index_range_from_data_range(i_start, i_end, data_edges, mc_edges):
 
 def _reorder_by_x_inplace(graphs, npts, nseries):
     """
-    Sort the first `npts` entries of graphs.* by increasing x,
+    Sort the first `npts` entries of graphs by increasing x,
     and apply the same permutation to all y and error arrays.
     """
     if npts <= 1:

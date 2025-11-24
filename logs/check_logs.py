@@ -3,7 +3,8 @@ import subprocess
 import shutil
 
 # ---------------
-# Example Command to Run: python3 logs/check_logs.py logs/Run3_2022/MuonC/ --era Run3_2022 --output /eos/cms/store/group/phys_tau/ksavva/TauTrgSF/
+# Example Command to Run: python3 logs/check_logs.py logs/Run3_2022/* --era Run3_2022 --output /eos/user/i/irandreo/TauTrgSF/PhysicsTools/Tau-Trigger-SF
+# Resubmission needs editing given new types of MC wildcards
 # --------------
 
 def create_sh_file(resubmit_path, out_filename, txt_file_path, isMC, era, output_dir):
@@ -50,7 +51,7 @@ def create_sh_file(resubmit_path, out_filename, txt_file_path, isMC, era, output
 
     # Construct the command
     command = (
-        f"python3 nano_postproc.py --input {input_path} "
+        f"python3 scripts/nano_postproc.py --input {input_path} "
         f"--isMC {isMC} --era {era} --output {output_dir}/"
     )
 
@@ -60,9 +61,11 @@ def create_sh_file(resubmit_path, out_filename, txt_file_path, isMC, era, output
     try:
         with open(sh_filename, "w") as sh_file:
             sh_file.write("#!/bin/bash\n")
-            sh_file.write(f"cd {dir_NanoAODTools}\n")
-            sh_file.write("source PhysicsTools/NanoAODTools/standalone/env_standalone.sh\n")
-            sh_file.write(f"cd {dir_NanoAODTools}/PhysicsTools/Tau-Trigger/\n")
+            sh_file.write("set -e # Exit on errors\n")
+            sh_file.write("set -x # Debug mode: print commands as they are executed\n")
+            sh_file.write(f"cd /eos/user/i/irandreo/TauTrgSF/PhysicsTools/NanoAODTools\n")
+            sh_file.write("source standalone/env_standalone.sh\n")
+            sh_file.write(f"cd /eos/user/i/irandreo/TauTrgSF/PhysicsTools/Tau-Trigger-SF\n")
             sh_file.write(command + "\n")
         os.chmod(sh_filename, 0o755)  # Make the .sh file executable
     except Exception as e:
@@ -105,6 +108,14 @@ def create_sub_file(resubmit_path, out_filename, year, data_type):
         f"error                   = {error_file}",
         f"output                  = {output_file}",
         "",
+        "should_transfer_files = YES",
+        "when_to_transfer_output = ON_EXIT",
+        "# Specify files to transfer",
+        "transfer_output_files   = _condor_stdout, _condor_stderr",
+        f"transfer_output_remaps  = \"_condor_stdout=/eos/user/i/irandreo/TauTrgSF/PhysicsTools/Tau-Trigger-SF/{output_file}, _condor_stderr=/eos/user/i/irandreo/TauTrgSF/PhysicsTools/Tau-Trigger-SF/{error_file}\"",
+
+        "request_memory = 8GB",
+
         "# Job runtime flavor",
         '+JobFlavour             = "longlunch"',
         "",
@@ -175,7 +186,7 @@ def process_directory(directory_path, era, output_dir):
                             # Create a .sh file
                             create_sh_file(resubmit_dir,out_filename, txt_file, isMC, era, output_dir)
                             sub_filepath = create_sub_file(resubmit_dir, out_filename,era,sample_type)
-                            subprocess.run(["condor_submit", sub_filepath], check=True)
+                            subprocess.run(["condor_submit", "-spool", sub_filepath], check=True)
                 else:
                     # Create an empty .out file in the resubmit directory
                     empty_out_filepath = os.path.join(resubmit_dir, out_filename)
@@ -183,7 +194,7 @@ def process_directory(directory_path, era, output_dir):
                     # Create a .sh file
                     create_sh_file(resubmit_dir,out_filename, txt_file, isMC, era, output_dir)
                     sub_filepath = create_sub_file(resubmit_dir, out_filename,era,sample_type)
-                    subprocess.run(["condor_submit", sub_filepath], check=True)
+                    subprocess.run(["condor_submit", "-spool", sub_filepath], check=True)
 
 
             except Exception as e:
@@ -195,11 +206,19 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Process a directory of .log files and handle corresponding .out files.")
-    parser.add_argument("directory_path", help="Path to the directory to process.")
+    parser.add_argument("directory_path", nargs="+", help="Path to the directory to process.")
     parser.add_argument("--era", required=True, help="Era for the command (e.g., 2022).")
     parser.add_argument("--output_dir", required=True, help="Directory for the command output.")
     args = parser.parse_args()
 
-    successes, total = process_directory(args.directory_path, args.era, args.output_dir)
-    print(f"Successes: {successes}/{total}")
-
+    total_successes = 0
+    total_files = 0
+    for directory_path in args.directory_path:
+        successes, total = process_directory(directory_path, args.era, args.output_dir)
+        total_successes += successes
+        total_files += total
+        
+        print(f"Processed directory: {directory_path}")
+        print(f"Successes: {successes}/{total}")
+    
+    print(f"Total Successes: {total_successes}/{total_files}")
