@@ -8,6 +8,7 @@ keep npu
 keep run
 keep lumi
 keep event
+keep genWeight
 keep *weight*
 keep HLT_IsoMu24
 keep HLT_IsoMu27
