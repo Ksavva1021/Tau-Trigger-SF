@@ -1,42 +1,30 @@
-print("Starting script...")
 import argparse
-print("Imported argparse")
 import os
 import sys
-print("Imported os, sys")
 import math
 import numpy as np
-print("Imported math, numpy")
 import matplotlib
 matplotlib.use('Agg')
-print("Set matplotlib backend to Agg")
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.ticker as ticker
-print("Imported matplotlib components")
 import mplhep as hep
-print("Imported mplhep")
 import scipy
 import copy
 from scipy import interpolate
 from scipy.ndimage import gaussian_filter1d
-print("Imported scipy components")
 
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern, ConstantKernel
-print("Imported sklearn components")
 
 import ROOT
 ROOT.gROOT.SetBatch(True)
 ROOT.TH1.SetDefaultSumw2()
-print("Imported and configured ROOT")
 
 sys.path.insert(0, 'Common/python')
 from RootObjects import Histogram, Graph
-print("Imported custom RootObjects")
 
 from array import array
-print("Imported array")
 
 # --------------
 # Example Command:
@@ -44,9 +32,6 @@ print("Imported array")
 # python3 scripts/fitTurnOn_multi.py --input TurnOnDeepTau/TurnOnDeepTau.root --output fitTurnOnDeepTau --decay_modes DeepTau
 # python3 scripts/fitTurnOn_multi.py --input TurnOnPNet/TurnOnPNet.root --output fitTurnOnPNet --decay_modes PNet
 # --------------
-
-print("About to parse arguments...")
-
 
 parser = argparse.ArgumentParser(description='Fit turn-on curves.')
 parser.add_argument('--input', required=True, type=str, help="ROOT file with turn-on curves")
