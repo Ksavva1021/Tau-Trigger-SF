@@ -101,3 +101,27 @@ keep HLT_IsoMu24_eta2p1_LooseDeepTauPFTauHPS180_eta2p1
 
 # monitoring etau and mutau
 keep HLT_IsoMu20_eta2p1_LooseDeepTauPFTauHPS27_eta2p1_CrossL1
+
+# 2024 trigger path
+# ditau
+keep HLT_DoublePNetTauhPFJet30_Medium_L2NN_eta2p3
+# mutau
+keep HLT_IsoMu20_eta2p1_PNetTauhPFJet27_Medium_eta2p3_CrossL1 
+# etau
+keep HLT_Ele24_eta2p1_WPTight_Gsf_PNetTauhPFJet30_Medium_eta2p3_CrossL1 
+# ditau+jet
+keep HLT_DoublePNetTauhPFJet26_L2NN_eta2p3_PFJet60
+keep HLT_DoublePNetTauhPFJet26_L2NN_eta2p3_PFJet75
+
+# 2024 monitoring path
+# monitoring ditau
+keep HLT_IsoMu24_eta2p1_PNetTauhPFJet30_Medium_L2NN_eta2p3_CrossL1
+# monitoring mutau (it is its own monitoring trigger)
+keep HLT_IsoMu20_eta2p1_PNetTauhPFJet27_Medium_eta2p3_CrossL1
+# monitoring etau
+keep HLT_IsoMu24_eta2p1_PNetTauhPFJet30_Medium_eta2p3_CrossL1_ETau_Monitoring
+# monitoring ditau+jet
+keep HLT_IsoMu24_eta2p1_PNetTauhPFJet26_L2NN_eta2p3_CrossL1
+keep HLT_IsoMu24_eta2p1_PNetTauhPFJet26_L2NN_eta2p3_CrossL1_PFJet60
+keep HLT_IsoMu24_eta2p1_PNetTauhPFJet26_L2NN_eta2p3_CrossL1_PFJet75
+

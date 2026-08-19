@@ -85,17 +85,30 @@ else:
     df = df.Define('weight', "muon_charge != tau_charge ? 1. : -1.")
 
 skimmed_branches = [
-    'tau_pt', 'tau_eta', 'tau_phi', 'tau_mass', 'tau_charge', 'tau_decayMode','tau_decayModePNet', 'weight', 'tau_idDeepTau2017v2p1VSjet', 'tau_idDeepTau2018v2p5VSjet',"tau_ipLengthSig","tau_hasRefitSV",'TrigObj_l1pt', 'TrigObj_l1iso', 'nTrigObj'
+    'tau_pt', 'tau_eta', 'tau_phi', 'tau_mass', 'tau_charge', 'tau_decayMode',
+    'tau_decayModePNet', 'weight', 'tau_idDeepTau2017v2p1VSjet',
+    'tau_idDeepTau2018v2p5VSjet', "tau_ipLengthSig", "tau_hasRefitSV",
+    'TrigObj_l1pt', 'TrigObj_l1iso', 'nTrigObj'
     # use monitoring path, as TnP won't work in HLT path
 ]
 
-df = df.Define("pass_mutau", "PassMuTauTrig2022(nTrigObj, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)")
-df = df.Define("pass_etau", "PassEleTauTrig2022(nTrigObj, TrigObj_l1pt, TrigObj_l1iso, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)")
-
+df = df.Define(
+    "pass_mutau",
+    "PassMuTauTrig2022(nTrigObj, TrigObj_id, TrigObj_filterBits,TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)"
+)
+df = df.Define(
+    "pass_etau",
+    "PassEleTauTrig2022(nTrigObj, TrigObj_l1pt, TrigObj_l1iso, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)"
+)
 # ditau -> drop !bit18 cut, change l1pt>32 with l1pt>=32
-df = df.Define("pass_ditau", "PassDiTauTrig2022(nTrigObj, TrigObj_l1pt, TrigObj_l1iso, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)")
-# 
-df = df.Define("pass_ditaujet", "PassDiTauJetTrig2022(nTrigObj, TrigObj_l1pt, TrigObj_l1iso, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)")
+df = df.Define(
+    "pass_ditau",
+    "PassDiTauTrig2022(nTrigObj, TrigObj_l1pt, TrigObj_l1iso, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)"
+) 
+df = df.Define(
+    "pass_ditaujet",
+    "PassDiTauJetTrig2022(nTrigObj, TrigObj_l1pt, TrigObj_l1iso, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)"
+)
 
 skimmed_branches.append("pass_ditau")
 skimmed_branches.append("pass_etau")
