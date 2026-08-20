@@ -11,15 +11,14 @@ import ROOT
 
 # -------------------------
 # Example commands:
-# python3 skimTuple.py --input_dir dir1,dir2,dir3 --selection DeepTau --type mc --pudata pudata.root --pumc pumc.root --output dir/skim_mc.root
-# python3 skimTuple.py --input_dir dir1_data,dir2_data --selection DeepTau --type data --output dir/skim_data.root
+# python3 skimTuple.py --input_dir dir1,dir2,dir3 --era 2022 --type mc --pudata pudata.root --pumc pumc.root --output dir/skim_mc.root
+# python3 skimTuple.py --input_dir dir1_data,dir2_data --era 2022 --type data --output dir/skim_data.root
 # ------------------------
-
 
 parser = argparse.ArgumentParser(description='Skim full tuple.')
 parser.add_argument('--input', required=False, type=str, nargs='+', help="input files")
 parser.add_argument('--input_dir', required=False, type=str, help="input directory/ies containing ROOT files (comma-separated)")
-parser.add_argument('--selection', required=True, type=str, help="tau selection")
+parser.add_argument('--era', required=True, type=str, help="2022, 2023, or 2024")
 parser.add_argument('--output', required=True, type=str, help="output file")
 parser.add_argument('--type', required=True, type=str, help="data or mc")
 parser.add_argument('--pudata', required=False, type=str, default=None,
@@ -37,12 +36,15 @@ ROOT.gROOT.SetBatch(True)
 ROOT.gInterpreter.Declare('#include "interface/PyInterface.h"')
 ROOT.gInterpreter.Declare('#include "interface/picoNtupler.h"')
 
+if args.type not in ['data', 'mc']:
+    raise RuntimeError("Invalid sample type")
+
 input_files = []
 
 if args.input:
     input_files.extend(args.input)
 
-if args.input_dir:
+elif args.input_dir:
     for input_dir in args.input_dir.split(','):
         if not os.path.isdir(input_dir):
             raise RuntimeError(f"Invalid directory: {input_dir}")
@@ -53,9 +55,6 @@ if not input_files:
     raise RuntimeError("No input files provided. Use --input or --input-dir to specify ROOT files.")
 
 print(input_files)
-
-if args.type not in ['data', 'mc']:
-    raise RuntimeError("Invalid sample type")
 
 input_vec = ListToStdVector(input_files)
 if args.type == 'mc':
@@ -68,15 +67,19 @@ if args.type == 'mc':
     mc_pu = mc_pu_file.Get('pileup')
     ROOT.PileUpWeightProvider.Initialize(data_pu, mc_pu)
 
-
-selection_id = ParseEnum(TauSelection, args.selection)
+id_algo_VSjet = {
+    '2022': 'DeepTau',
+    '2023': 'DeepTau',
+    '2024': 'PNet'
+}
+selection_id = ParseEnum(TauSelection, id_algo_VSjet[args.era])
 df = ROOT.RDataFrame('Events', input_vec)
 df = df.Filter('''
                (tau_sel & {}) != 0 && muon_pt > 24 && muon_iso < 0.1 && muon_mt < 30
                && tau_pt > 20 && abs(tau_eta) < 2.1 && tau_decayMode != 5 && tau_decayMode != 6
                && vis_mass > 40 && vis_mass < 80
                '''.format(selection_id))
-if selection_id == TauSelection.DeepTau:
+if selection_id == TauSelection.DeepTau or selection_id == TauSelection.PNet:
     df = df.Filter('( tau_idDeepTau2018v2p5VSmu  & 4) != 0')
 if args.type == 'mc':
     df = df.Filter('tau_charge + muon_charge == 0 && tau_gen_match == 5')
@@ -86,28 +89,35 @@ else:
 
 skimmed_branches = [
     'tau_pt', 'tau_eta', 'tau_phi', 'tau_mass', 'tau_charge', 'tau_decayMode',
-    'tau_decayModePNet', 'weight', 'tau_idDeepTau2017v2p1VSjet',
-    'tau_idDeepTau2018v2p5VSjet', "tau_ipLengthSig", "tau_hasRefitSV",
-    'TrigObj_l1pt', 'TrigObj_l1iso', 'nTrigObj'
-    # use monitoring path, as TnP won't work in HLT path
+    'tau_decayModePNet', 'weight', 'tau_idDeepTau2018v2p5VSjet',
+    "tau_ipLengthSig", "tau_hasRefitSV", 'TrigObj_l1pt', 'TrigObj_l1iso',
+    'nTrigObj'
 ]
+
+# use monitoring path, as TnP won't work in HLT path
+monitoring_trigger_era_key = {
+    '2022': '2022',
+    '2023': '2022',
+    '2024': '2024'
+}
+monitoring_trigger_era = monitoring_trigger_era_key[args.era]
 
 df = df.Define(
     "pass_mutau",
-    "PassMuTauTrig2022(nTrigObj, TrigObj_id, TrigObj_filterBits,TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)"
+    f"PassMuTauTrig{monitoring_trigger_era}(nTrigObj, TrigObj_id, TrigObj_filterBits,TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)"
 )
 df = df.Define(
     "pass_etau",
-    "PassEleTauTrig2022(nTrigObj, TrigObj_l1pt, TrigObj_l1iso, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)"
+    f"PassEleTauTrig{monitoring_trigger_era}(nTrigObj, TrigObj_l1pt, TrigObj_l1iso, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)"
 )
 # ditau -> drop !bit18 cut, change l1pt>32 with l1pt>=32
 df = df.Define(
     "pass_ditau",
-    "PassDiTauTrig2022(nTrigObj, TrigObj_l1pt, TrigObj_l1iso, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)"
+    f"PassDiTauTrig{monitoring_trigger_era}(nTrigObj, TrigObj_l1pt, TrigObj_l1iso, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)"
 ) 
 df = df.Define(
     "pass_ditaujet",
-    "PassDiTauJetTrig2022(nTrigObj, TrigObj_l1pt, TrigObj_l1iso, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)"
+    f"PassDiTauJetTrig{monitoring_trigger_era}(nTrigObj, TrigObj_l1pt, TrigObj_l1iso, TrigObj_id, TrigObj_filterBits, TrigObj_pt, TrigObj_eta, TrigObj_phi, tau_pt, tau_eta, tau_phi)"
 )
 
 skimmed_branches.append("pass_ditau")

@@ -6,6 +6,7 @@ import sys; sys.path.append('python')
 import ROOT
 import argparse
 import pickle
+import json
 
 from summaryProducer import *
 from selectionFilter import *
@@ -17,16 +18,16 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Post Processing.')
     parser.add_argument('--input', required=False, type=str, help="NANO input")
-    parser.add_argument('--inputFileList', required=False, type=str, help="NANO input file list")
-    parser.add_argument('--output', required=True, type=str, help="eventTuple output")
-    parser.add_argument('--isMC', required=True, type=int, help="judge if isMC")
-    parser.add_argument('--era', required=True, type=str, help="")
+    parser.add_argument('--inputJson', required=False, type=str, help="NANO input file list (HiggsDNA style sample json)")
+    parser.add_argument('--output', required=True, type=str, help="Output directory")
+    parser.add_argument('--isMC', action='store_true', help="is it MC?")
+    parser.add_argument('--era', required=True, type=str, help="2022, 2023, 2024")
     args = parser.parse_args()
     print("args = ",args)
 
-    if (args.input is None) and (args.inputFileList is None):
+    if (args.input is None) and (args.inputJson is None):
         raise RuntimeError("Please check the input!")
-    if (args.input is not None) and (args.inputFileList is not None):
+    if (args.input is not None) and (args.inputJson is not None):
         raise RuntimeError("Please check the input!")
 
     isMC = args.isMC
@@ -34,9 +35,17 @@ if __name__ == "__main__":
     era = args.era
     if args.input:
         files = [ args.input ]
-    if args.inputFileList:
-        f = open(args.inputFileList, "r")
-        files = f.read().splitlines()
+    if args.inputJson:
+        with open(args.inputJson, 'r') as f:
+            samples = json.load(f)
+        if isMC:
+            files = samples['DYto2Tau_MLL_50_amcatnloFXFX']
+        else:
+            files = []
+            for key in samples.keys():
+                if 'Muon' in key:
+                    print(f"Adding files from key: {key}")
+                    files.extend(samples[key])
 
     if era == "2022EE": era = "2022"
     if era == "2023BPix": era = "2023"
@@ -53,6 +62,8 @@ if __name__ == "__main__":
             Modules = [summary2022MC(), selection2022MC(), tuple2022MC()]
         elif era == '2023':
             Modules = [summary2023MC(), selection2023MC(), tuple2023MC()]
+        elif era == '2024':
+            Modules = [summary2024MC(), selection2024MC(), tuple2024MC()]
         else:
             raise RuntimeError("Please check the right Year!")
         p = PostProcessor(output, files, "1", 
@@ -65,17 +76,22 @@ if __name__ == "__main__":
     else:
         if era == '2022':
             Modules = [summary2022data(), selection2022data(), tuple2022data()]
-            lumi_json_path = './lumi_jsons/2022.txt' 
+            lumi_json_path = './lumi_jsons/2022.pkl' 
         elif era == '2023':
             Modules = [summary2023data(), selection2023data(), tuple2023data()]
-            lumi_json_path = './lumi_jsons/2023.txt'
+            lumi_json_path = './lumi_jsons/2023.pkl'
+        elif era == '2024':
+            Modules = [summary2024data(), selection2024data(), tuple2024data()]
+            lumi_json_path = './lumi_jsons/Cert_Collisions2024_378981_386951_Golden.json'
         else:
             raise RuntimeError("Please check the right Year!")
 
-        with open('./lumi_jsons/'+era+'.pkl', 'rb') as file:
-            runsAndLumis_special = pickle.load(file)
-     
-        jsoninput = runsAndLumis_special
+        if lumi_json_path.endswith('.pkl'):
+            with open(lumi_json_path, 'rb') as file:
+                jsoninput = pickle.load(file)
+        elif lumi_json_path.endswith('.json'):
+            with open(lumi_json_path, 'r') as file:
+                jsoninput = json.load(file)
 
         p = PostProcessor(output, files, "1", 
                         branchsel = "keep_and_drop.txt", 

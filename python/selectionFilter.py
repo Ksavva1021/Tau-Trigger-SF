@@ -160,8 +160,9 @@ class selectionFilter(Module):
                     break
 
         # Apply MET filter
-        if not flag.METFilters:
-            pass_MET_filter = False
+        if self.era != "2024":
+            if not flag.METFilters:
+                pass_MET_filter = False
 
         # return result
         '''
@@ -202,8 +203,10 @@ selection2017MC = lambda : selectionFilter(True,"2017")
 selection2018MC = lambda : selectionFilter(True,"2018")
 selection2022MC = lambda : selectionFilter(True,"2022")
 selection2023MC = lambda : selectionFilter(True,"2023")
+selection2024MC = lambda : selectionFilter(True,"2024")
 selection2016data = lambda : selectionFilter(False,"2016")
 selection2017data = lambda : selectionFilter(False,"2017")
 selection2018data = lambda : selectionFilter(False,"2018")
 selection2022data = lambda : selectionFilter(False,"2022")
 selection2023data = lambda : selectionFilter(False,"2023")
+selection2024data = lambda : selectionFilter(False,"2024")

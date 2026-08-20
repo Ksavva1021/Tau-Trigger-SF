@@ -17,6 +17,7 @@ class TauSelection:
     pt = 2
     MVA = 4
     DeepTau = 8
+    PNet = 16
 
 class Channel:
     etau = 1

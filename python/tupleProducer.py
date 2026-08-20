@@ -98,13 +98,13 @@ class tupleProducer(Module):
         self.out.branch("tau_dxy", "F")
         self.out.branch("tau_dz", "F")
         
-        self.out.branch("tau_idDeepTau2017v2p1VSe", "I")
-        self.out.branch("tau_idDeepTau2017v2p1VSmu", "I")
-        self.out.branch("tau_idDeepTau2017v2p1VSjet", "I")
+        # self.out.branch("tau_idDeepTau2017v2p1VSe", "I")
+        # self.out.branch("tau_idDeepTau2017v2p1VSmu", "I")
+        # self.out.branch("tau_idDeepTau2017v2p1VSjet", "I")
 
-        self.out.branch("tau_rawDeepTau2017v2p1VSe", "F")
-        self.out.branch("tau_rawDeepTau2017v2p1VSmu", "F")
-        self.out.branch("tau_rawDeepTau2017v2p1VSjet", "F")
+        # self.out.branch("tau_rawDeepTau2017v2p1VSe", "F")
+        # self.out.branch("tau_rawDeepTau2017v2p1VSmu", "F")
+        # self.out.branch("tau_rawDeepTau2017v2p1VSjet", "F")
                 
         self.out.branch("tau_idDeepTau2018v2p5VSe", "I")
         self.out.branch("tau_idDeepTau2018v2p5VSmu", "I")
@@ -113,6 +113,10 @@ class tupleProducer(Module):
         self.out.branch("tau_rawDeepTau2018v2p5VSe", "F")
         self.out.branch("tau_rawDeepTau2018v2p5VSmu", "F")
         self.out.branch("tau_rawDeepTau2018v2p5VSjet", "F")
+
+        if self.era == "2024":
+            self.out.branch("tau_idPNetVSjet", "I")
+            self.out.branch("tau_rawPNetVSjet", "F")
 
         self.out.branch("tau_gen_vis_pt", "F")
         self.out.branch("tau_gen_vis_eta", "F")
@@ -524,6 +528,7 @@ class tupleProducer(Module):
         pt = 2
         mva = 4
         deepTau = 8
+        PNet = 16
         best_tau = dict()
         for _t, _tau in enumerate(taus):
             _tau_v4 = _tau.p4()
@@ -537,7 +542,8 @@ class tupleProducer(Module):
                     pass_mva_sel = (_tau.decayMode != 5) and (_tau.decayMode != 6)
 
                 pass_deep_sel = ( (_tau.rawDeepTau2018v2p5VSjet > 0) and (_tau.rawDeepTau2018v2p5VSe > 0.5) and (_tau.rawDeepTau2018v2p5VSmu > 0.5) )
-                if (pass_mva_sel or pass_deep_sel) and ( (pt not in best_tau.keys()) or (best_tau[pt].p4().Pt() < _tau.p4().Pt()) ):
+                pass_pnet_sel = ( (_tau.rawPNetVSjet > 0) and (_tau.rawPNetVSe > 0.8) and (_tau.rawPNetVSmu > 0.8) )
+                if (pass_mva_sel or pass_deep_sel or pass_pnet_sel) and ( (pt not in best_tau.keys()) or (best_tau[pt].p4().Pt() < _tau.p4().Pt()) ):
                     best_tau[pt] = _tau
 
                 if (self.nanoVer == 10 or self.nanoVer == 11):
@@ -553,6 +559,10 @@ class tupleProducer(Module):
                 # may need to change to rawDeepTau2018v2p5VSjet
                 if pass_deep_sel and ( (deepTau not in best_tau.keys()) or (best_tau[deepTau].rawDeepTau2018v2p5VSjet < _tau.rawDeepTau2018v2p5VSjet) ):
                     best_tau[deepTau] = _tau
+
+                if pass_pnet_sel and ( (PNet not in best_tau.keys()) or (best_tau[PNet].rawPNetVSjet < _tau.rawPNetVSjet) ):
+                    best_tau[PNet] = _tau
+
         #
         if genleptons is None:
             selected_gen_tau = None
@@ -853,12 +863,12 @@ class tupleProducer(Module):
             self.out.fillBranch("tau_hasRefitSV", tau.hasRefitSV)
             self.out.fillBranch("tau_dxy", tau.dxy)
             self.out.fillBranch("tau_dz", tau.dz)
-            self.out.fillBranch("tau_idDeepTau2017v2p1VSe", tau.idDeepTau2017v2p1VSe)
-            self.out.fillBranch("tau_idDeepTau2017v2p1VSmu", tau.idDeepTau2017v2p1VSmu)
-            self.out.fillBranch("tau_idDeepTau2017v2p1VSjet", tau.idDeepTau2017v2p1VSjet)
-            self.out.fillBranch("tau_rawDeepTau2017v2p1VSe", tau.rawDeepTau2017v2p1VSe)
-            self.out.fillBranch("tau_rawDeepTau2017v2p1VSmu", tau.rawDeepTau2017v2p1VSmu)
-            self.out.fillBranch("tau_rawDeepTau2017v2p1VSjet", tau.rawDeepTau2017v2p1VSjet)
+            # self.out.fillBranch("tau_idDeepTau2017v2p1VSe", tau.idDeepTau2017v2p1VSe)
+            # self.out.fillBranch("tau_idDeepTau2017v2p1VSmu", tau.idDeepTau2017v2p1VSmu)
+            # self.out.fillBranch("tau_idDeepTau2017v2p1VSjet", tau.idDeepTau2017v2p1VSjet)
+            # self.out.fillBranch("tau_rawDeepTau2017v2p1VSe", tau.rawDeepTau2017v2p1VSe)
+            # self.out.fillBranch("tau_rawDeepTau2017v2p1VSmu", tau.rawDeepTau2017v2p1VSmu)
+            # self.out.fillBranch("tau_rawDeepTau2017v2p1VSjet", tau.rawDeepTau2017v2p1VSjet)
             
             self.out.fillBranch("tau_idDeepTau2018v2p5VSe", tau.idDeepTau2018v2p5VSe)
             self.out.fillBranch("tau_idDeepTau2018v2p5VSmu", tau.idDeepTau2018v2p5VSmu)
@@ -866,6 +876,30 @@ class tupleProducer(Module):
             self.out.fillBranch("tau_rawDeepTau2018v2p5VSe", tau.rawDeepTau2018v2p5VSe)
             self.out.fillBranch("tau_rawDeepTau2018v2p5VSmu", tau.rawDeepTau2018v2p5VSmu)
             self.out.fillBranch("tau_rawDeepTau2018v2p5VSjet", tau.rawDeepTau2018v2p5VSjet)
+
+            if self.era == "2024":
+                tau_rawPNetVSjet = tau.rawPNetVSjet
+                if tau_rawPNetVSjet > 0.974:  # VVTight
+                    tau_idPNetVSjet = 8
+                elif tau_rawPNetVSjet > 0.949:  # VTight
+                    tau_idPNetVSjet = 7
+                elif tau_rawPNetVSjet > 0.906:  # Tight
+                    tau_idPNetVSjet = 6
+                elif tau_rawPNetVSjet > 0.835:  # Medium
+                    tau_idPNetVSjet = 5
+                elif tau_rawPNetVSjet > 0.691:  # Loose
+                    tau_idPNetVSjet = 4
+                elif tau_rawPNetVSjet > 0.402:  # VLoose
+                    tau_idPNetVSjet = 3
+                elif tau_rawPNetVSjet > 0.208:  # VVLoose
+                    tau_idPNetVSjet = 2
+                elif tau_rawPNetVSjet > 0.114:  # VVVLoose
+                    tau_idPNetVSjet = 1
+                else:
+                    tau_idPNetVSjet = 0
+
+                self.out.fillBranch("tau_rawPNetVSjet", tau_rawPNetVSjet)
+                self.out.fillBranch("tau_idPNetVSjet", tau_idPNetVSjet)
         else:
             self.out.fillBranch("tau_pt", -999.0)
             self.out.fillBranch("tau_eta", -999.0)
@@ -878,12 +912,12 @@ class tupleProducer(Module):
             self.out.fillBranch("tau_hasRefitSV", -999.0)
             self.out.fillBranch("tau_dxy", -999.0)
             self.out.fillBranch("tau_dz", -999.0)
-            self.out.fillBranch("tau_idDeepTau2017v2p1VSe", -999)
-            self.out.fillBranch("tau_idDeepTau2017v2p1VSmu", -999)
-            self.out.fillBranch("tau_idDeepTau2017v2p1VSjet", -999)
-            self.out.fillBranch("tau_rawDeepTau2017v2p1VSe", -999.0)
-            self.out.fillBranch("tau_rawDeepTau2017v2p1VSmu", -999.0)
-            self.out.fillBranch("tau_rawDeepTau2017v2p1VSjet", -999.0)
+            # self.out.fillBranch("tau_idDeepTau2017v2p1VSe", -999)
+            # self.out.fillBranch("tau_idDeepTau2017v2p1VSmu", -999)
+            # self.out.fillBranch("tau_idDeepTau2017v2p1VSjet", -999)
+            # self.out.fillBranch("tau_rawDeepTau2017v2p1VSe", -999.0)
+            # self.out.fillBranch("tau_rawDeepTau2017v2p1VSmu", -999.0)
+            # self.out.fillBranch("tau_rawDeepTau2017v2p1VSjet", -999.0)
 
             self.out.fillBranch("tau_idDeepTau2018v2p5VSe", -999)
             self.out.fillBranch("tau_idDeepTau2018v2p5VSmu", -999)
@@ -891,6 +925,11 @@ class tupleProducer(Module):
             self.out.fillBranch("tau_rawDeepTau2018v2p5VSe", -999.0)
             self.out.fillBranch("tau_rawDeepTau2018v2p5VSmu", -999.0)
             self.out.fillBranch("tau_rawDeepTau2018v2p5VSjet", -999.0)
+
+            if self.era == "2024":
+                self.out.fillBranch("tau_idPNetVSjet", -999)
+                self.out.fillBranch("tau_rawPNetVSjet", -999.0)
+
         # fill visible mass
         self.out.fillBranch("vis_mass", (signalMu_v4 + tau_ref_p4).M())
         # fill other
@@ -946,8 +985,10 @@ tuple2017MC = lambda : tupleProducer(True,"2017")
 tuple2018MC = lambda : tupleProducer(True,"2018")
 tuple2022MC = lambda : tupleProducer(True,"2022")
 tuple2023MC = lambda : tupleProducer(True,"2023")
+tuple2024MC = lambda : tupleProducer(True,"2024")
 tuple2016data = lambda : tupleProducer(False,"2016")
 tuple2017data = lambda : tupleProducer(False,"2017")
 tuple2018data = lambda : tupleProducer(False,"2018")
 tuple2022data = lambda : tupleProducer(False,"2022")
 tuple2023data = lambda : tupleProducer(False,"2023")
+tuple2024data = lambda : tupleProducer(False,"2024")

@@ -687,7 +687,7 @@ bool PassDiTauTrig2024(UInt_t ntrig,Vec_t trig_l1pt, Vec_i trig_l1iso, Vec_i tri
     const ROOT::Math::PtEtaPhiMVector trig(trig_pt[it],trig_eta[it],trig_phi[it],0);
     float dR = deltaR(trig.Eta(),tau_eta,trig.Phi(),tau_phi);
     if (dR < 0.5){ // HLT_IsoMu24_eta2p1_PNetTauhPFJet30_Medium_L2NN_eta2p3_CrossL1 trigger bits are 1, 4, 23
-      if((trig_bits[it] & (1<<1)) != 0 && (trig_bits[it] & (1<<4)) != 0 && (trig_bits[it] & (1<<23)) != 0 && trig_id[it] == 15 && trig_pt[it] > 35){ 
+      if((trig_bits[it] & (1<<1)) != 0 && (trig_bits[it] & (1<<4)) != 0 && (trig_bits[it] & (1<<23)) != 0 && trig_id[it] == 15 && trig_pt[it] > 30){ 
         if ( (trig_l1iso[it] > 0 && trig_l1pt[it] >= 32) || trig_l1pt[it] > 70 ) {
           return true;
         }
@@ -705,7 +705,7 @@ bool PassDiTauJetTrig2024(UInt_t ntrig,Vec_t trig_l1pt, Vec_i trig_l1iso, Vec_i 
     float dR = deltaR(trig.Eta(),tau_eta,trig.Phi(),tau_phi);
     if (dR < 0.5){ // HLT_IsoMu24_eta2p1_PNetTauhPFJet26_L2NN_eta2p3_CrossL1 trigger bits are 4, 20 
       if((trig_bits[it] & (1<<4)) != 0 && (trig_bits[it] & (1<<20)) != 0 && trig_id[it] == 15){ 
-        if ( (trig_pt[it] > 30 && trig_l1iso[it] > 0 && trig_l1pt[it] > 26) )  
+        if ( (trig_pt[it] > 26 && trig_l1iso[it] > 0 && trig_l1pt[it] > 26) )  
           return true;
       }
     }
