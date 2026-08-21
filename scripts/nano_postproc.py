@@ -15,26 +15,19 @@ from submitJob import condor_submit
 
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 
-if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='Post Processing.')
-    parser.add_argument('--input', required=False, type=str, help="NANO input")
-    parser.add_argument('--inputJson', required=False, type=str, help="NANO input file list (HiggsDNA style sample json)")
-    parser.add_argument('--output', required=True, type=str, help="Output directory")
-    parser.add_argument('--isMC', action='store_true', help="is it MC?")
-    parser.add_argument('--era', required=True, type=str, help="2022, 2023, 2024")
-    parser.add_argument('--batch', action='store_true', help="run in batch mode")
-    args = parser.parse_args()
-    print("args = ",args)
-
+def main(args):
     if (args.input is None) and (args.inputJson is None):
-        raise RuntimeError("Please check the input!")
+            raise RuntimeError("Please check the input!")
     if (args.input is not None) and (args.inputJson is not None):
-        raise RuntimeError("Please check the input!")
-
+            raise RuntimeError("Please check the input!")
+    
     isMC = args.isMC
-    output = args.output
     era = args.era
+
+    if era == "2022EE": era = "2022"
+    if era == "2023BPix": era = "2023"
+
     if args.input:
         files = [ args.input ]
     if args.inputJson:
@@ -43,14 +36,11 @@ if __name__ == "__main__":
         if isMC:
             files = samples['DYto2Tau_MLL_50_amcatnloFXFX']
         else:
-            files = []
+            files = {}
             for key in samples.keys():
                 if 'Muon' in key:  # Muon datasets
                     print(f"Adding files from key: {key}")
-                    files.extend(samples[key])
-
-    if era == "2022EE": era = "2022"
-    if era == "2023BPix": era = "2023"
+                    files[key] = samples[key]
 
     if not args.batch:
         if isMC:
@@ -69,11 +59,11 @@ if __name__ == "__main__":
                 Modules = [summary2024MC(), selection2024MC(), tuple2024MC()]
             else:
                 raise RuntimeError("Please check the right Year!")
-            p = PostProcessor(output, files, "1", 
-                              branchsel = "keep_and_drop.txt", 
-                              modules= Modules, 
-                              provenance=True,
-                              outputbranchsel = "output_branch.txt"
+            p = PostProcessor(args.output, files, "1", 
+                                branchsel = "keep_and_drop.txt", 
+                                modules= Modules, 
+                                provenance=True,
+                                outputbranchsel = "output_branch.txt"
             )
 
         else:
@@ -96,13 +86,27 @@ if __name__ == "__main__":
                 with open(lumi_json_path, 'r') as file:
                     jsoninput = json.load(file)
 
-            p = PostProcessor(output, files, "1", 
-                              branchsel = "keep_and_drop.txt", 
-                              modules= Modules, 
-                              jsonInput=jsoninput,
-                              provenance=True,
-                              outputbranchsel = "output_branch.txt"
-            )
+            if not args.inputJson:
+                p = PostProcessor(args.output, files, "1", 
+                                branchsel = "keep_and_drop.txt", 
+                                modules= Modules, 
+                                jsonInput=jsoninput,
+                                provenance=True,
+                                outputbranchsel = "output_branch.txt"
+                )
+
+            else:
+                for key in files.keys():
+                    output = os.path.join(args.output, key)
+                    os.makedirs(output, exist_ok=True)
+                    print(f"Processing files from key: {key}")
+                    p = PostProcessor(output, files[key], "1", 
+                                    branchsel = "keep_and_drop.txt", 
+                                    modules= Modules, 
+                                    jsonInput=jsoninput,
+                                    provenance=True,
+                                    outputbranchsel = "output_branch.txt"
+                    )
 
         p.run()
         print("Done !")
@@ -116,10 +120,17 @@ if __name__ == "__main__":
                     f"python3 scripts/nano_postproc.py --input {file} --isMC --era {args.era} --output {args.output}"
                 )
         else:
-            for file in files:
-                commands.append(
-                    f"python3 scripts/nano_postproc.py --input {file} --era {args.era} --output {args.output}"
-                )
+            if not args.inputJson:
+                for file in files:
+                    commands.append(
+                        f"python3 scripts/nano_postproc.py --input {file} --era {args.era} --output {args.output}"
+                    )
+            else:
+                for key in files.keys():
+                    for file in files[key]:
+                        commands.append(
+                            f"python3 scripts/nano_postproc.py --input {file} --era {args.era} --output {args.output}/{key}"
+                        )
         
         for i in range(0, len(commands), BATCH_SIZE):
             batch_commands = commands[i:min(i + BATCH_SIZE, len(commands))]
@@ -136,3 +147,17 @@ if __name__ == "__main__":
             os.makedirs(condor_dir, exist_ok=True)
             condor_submit(batch_commands, condor_dir, job_name)
 
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Post Processing.')
+    parser.add_argument('--input', required=False, type=str, help="NANO input")
+    parser.add_argument('--inputJson', required=False, type=str, help="NANO input file list (HiggsDNA style sample json)")
+    parser.add_argument('--output', required=True, type=str, help="Output directory")
+    parser.add_argument('--isMC', action='store_true', help="is it MC?")
+    parser.add_argument('--era', required=True, type=str, help="2022, 2023, 2024")
+    parser.add_argument('--batch', action='store_true', help="run in batch mode")
+    args = parser.parse_args()
+    print("args = ",args)
+
+    main(args)
