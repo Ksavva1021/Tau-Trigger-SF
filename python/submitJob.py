@@ -17,7 +17,7 @@ def condor_submit(commands, condor_dir, job_name):
         f.write(f"log = {condor_dir}/{job_name}.$(Cluster).log\n")
         f.write("request_cpus = 1\n")
         f.write("request_memory = 2GB\n")
-        f.write("+MaxRuntime = 18000\n")  # Set max runtime to 5 hours
+        f.write("+MaxRuntime = 86400\n")  # Set max runtime to 24 hours
         f.write("queue\n")
 
     subprocess.run(["condor_submit", f"{condor_dir}/{job_name}.sub"])

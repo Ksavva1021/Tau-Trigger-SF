@@ -45,7 +45,7 @@ if __name__ == "__main__":
         else:
             files = []
             for key in samples.keys():
-                if 'Muon' in key:
+                if 'Muon' in key:  # Muon datasets
                     print(f"Adding files from key: {key}")
                     files.extend(samples[key])
 

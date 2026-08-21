@@ -664,14 +664,15 @@ bool PassMuTauTrig2024(UInt_t ntrig,Vec_i trig_id,Vec_i trig_bits,Vec_t trig_pt,
   return false;
 }
 
+// Same monitoring path as mutau, just as was done in 22
 bool PassEleTauTrig2024(UInt_t ntrig,Vec_t trig_l1pt, Vec_i trig_l1iso, Vec_i trig_id,Vec_i trig_bits,Vec_t trig_pt,Vec_t trig_eta,Vec_t trig_phi,float tau_pt,float tau_eta,float tau_phi){
   if (tau_pt <= 0)
     return false;
   for(int it=0; it < ntrig; it++){
     const ROOT::Math::PtEtaPhiMVector trig(trig_pt[it],trig_eta[it],trig_phi[it],0);
     float dR = deltaR(trig.Eta(),tau_eta,trig.Phi(),tau_phi);
-    if (dR < 0.5){ // HLT_IsoMu24_eta2p1_PNetTauhPFJet30_Medium_eta2p3_CrossL1_ETau_Monitoring trigger bits are 1, 4, 27
-      if((trig_bits[it] & (1<<1)) != 0 && (trig_bits[it] & (1<<4)) != 0 && (trig_bits[it] & (1<<27)) != 0 && trig_id[it] == 15
+    if (dR < 0.5){ // HLT_IsoMu20_eta2p1_PNetTauhPFJet27_Medium_eta2p3_CrossL1 trigger bits are 1, 4, 13
+      if((trig_bits[it] & (1<<1)) != 0 && (trig_bits[it] & (1<<4)) != 0 && (trig_bits[it] & (1<<13)) != 0 && trig_id[it] == 15
           && trig_pt[it] > 30 && trig_l1iso[it] > 0 && trig_l1pt[it] > 26){ 
           return true;
       }

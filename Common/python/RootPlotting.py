@@ -1,5 +1,6 @@
 from array import array
 import math
+import re
 import numpy as np
 import ROOT
 
@@ -241,7 +242,9 @@ def GetPrintSuffix(current_page_number, total_number_of_pages):
 def PrintAndClear(canvas, file, title, current_page_number, total_number_of_pages, dm, pads = []):
     canvas.Print(file + GetPrintSuffix(current_page_number, total_number_of_pages),
                  'Title:{}'.format(title))
-    canvas.SaveAs(file[:-4] + "{}.png".format(dm))
+    png_title = title if isinstance(title, str) and len(title) > 0 else str(current_page_number)
+    png_title = re.sub(r'[^A-Za-z0-9._-]+', '_', png_title).strip('_')
+    canvas.SaveAs(file[:-4] + "_{}.png".format(png_title))
     for pad in pads:
         pad.Clear()
     canvas.Clear()

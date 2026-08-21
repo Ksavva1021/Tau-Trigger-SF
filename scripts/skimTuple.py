@@ -54,7 +54,7 @@ elif args.input_dir:
 if not input_files:
     raise RuntimeError("No input files provided. Use --input or --input-dir to specify ROOT files.")
 
-print(input_files)
+print(f'\033[1;32mINFO\033[0m: Found {len(input_files)} input files.')
 
 input_vec = ListToStdVector(input_files)
 if args.type == 'mc':
@@ -90,8 +90,8 @@ else:
 skimmed_branches = [
     'tau_pt', 'tau_eta', 'tau_phi', 'tau_mass', 'tau_charge', 'tau_decayMode',
     'tau_decayModePNet', 'weight', 'tau_idDeepTau2018v2p5VSjet',
-    "tau_ipLengthSig", "tau_hasRefitSV", 'TrigObj_l1pt', 'TrigObj_l1iso',
-    'nTrigObj'
+    'tau_idPNetVSjet', 'tau_ipLengthSig', 'tau_hasRefitSV', 'TrigObj_l1pt',
+    'TrigObj_l1iso', 'nTrigObj'
 ]
 
 # use monitoring path, as TnP won't work in HLT path

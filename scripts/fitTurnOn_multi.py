@@ -120,6 +120,7 @@ working_points = args.working_points.split(',')
 ch_validity_thrs = { 'etau': 35, 'mutau': 32, 'ditau': 40, 'ditaujet': 40, }
 
 file = ROOT.TFile(args.input, 'READ')
+os.makedirs(os.path.dirname(args.output), exist_ok=True)
 output_file = ROOT.TFile('{}.root'.format(args.output), 'RECREATE', '', ROOT.RCompressionSetting.EDefaults.kUseSmallest)
 
 for channel in channels:
@@ -202,7 +203,7 @@ for channel in channels:
                               np.concatenate([sf - sf_sigma, (sf + sf_sigma)[::-1]]),
                               alpha=trans, fc='b', ec='None')
 
-                title = "Turn-ons for {} trigger with {} DeepTau VSjet".format(channel, wp)
+                title = "Turn-ons for {} trigger with {} VSjet".format(channel, wp)
                 if dm != 'all':
                     title += " for DM={}".format(dm)
                 else:

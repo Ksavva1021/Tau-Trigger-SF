@@ -2,10 +2,8 @@
 
 import argparse
 from array import array
-import math
 import numpy as np
 import os
-import re
 import sys
 import ROOT
 
@@ -21,6 +19,7 @@ parser.add_argument('--output', required=True, type=str, help="output file prefi
 parser.add_argument('--channels', required=False, type=str, default='etau,mutau,ditau,ditaujet', help="channels to process")
 # parser.add_argument('--channels', required=False, type=str, default='ditau,ditau_withptiso_nobitcut,ditau_withptiso_bit1,ditau_withptiso_bit1_bit17,ditau_withptiso_bit1_bit17_0bit18', help="channels to process")
 parser.add_argument('--decay-modes', required=False, type=str, default='all,0,1,2,10,11', help="decay modes to process")
+parser.add_argument('--id-algo', default='DeepTau2018v2p5', type=str, help='tau ID algorithm to use, DeepTau or PNet')
 parser.add_argument('--working-points', required=False, type=str,
                     default='VVVLoose,VVLoose,VLoose,Loose,Medium,Tight,VTight,VVTight',
                     help="working points to process")
@@ -193,7 +192,7 @@ hist_models = {
 turnOn_data = [None] * n_inputs
 for input_id in range(n_inputs):
     print("Creating {} histograms...".format(labels[input_id]))
-    turnOn_data[input_id] = CreateHistograms(input_files[input_id], channels, decay_modes, 'tau_idDeepTau2018v2p5VSjet', # tau_idDeepTau2017v2p1VSjet,
+    turnOn_data[input_id] = CreateHistograms(input_files[input_id], channels, decay_modes, f'tau_id{args.id_algo}VSjet',
                                              working_points, hist_models, labels[input_id], var, output_file)
 
 colors = [ ROOT.kRed, ROOT.kBlack ]
