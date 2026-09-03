@@ -10,7 +10,7 @@ Once you have set up your installation of CMSSW, clone this repo inside of the `
 ___
 ## 1) Producing n-tuples from the central NanoAOD files
 
-Triggers have efficiencies which are dependent on the $p_\mathrm T$ of the object being triggered upon. Plotting a trigger's efficiency as a function of $p_\mathrm T$ produces a curve. This curve is referred to as a "turn-on" curve. Producing accurate Monte Carlo simulations of how particles interact with the CMS detector is challenging. As such, the "turn-on" curve in data looks slightly different to how it looks in MC. To make MC look more like real data, we multiply the weight of MC events by a correction factor we call a Scale Factor (which is usually a function of $p_\mathrm T$), which we derive by comparing the "turn-on" curves in data and MC. As detector conditions are era dependent, so too are Scale Factors. Thus, the first step is to procure samples of both data and MC events corresponding to the era for which we are measuring our Scale Factors.
+Triggers have efficiencies which are dependent on the $p_\mathrm T$ of the object being triggered upon. Plotting a trigger's efficiency as a function of $p_\mathrm T$ produces a curve. This curve is referred to as a "turn-on" curve. Producing accurate Monte Carlo simulations of how particles interact with the CMS detector is challenging. As such, the "turn-on" curve in data looks slightly different to how it looks in MC. To make MC look more like real data, we multiply the weight of MC events by a correction factor we call a Scale Factor (which in this case are a function of $p_\mathrm T$ AND the PNet DM of the $\tau_\mathrm h$), which we derive by comparing the "turn-on" curves in data and MC. As detector conditions are era dependent, so too are Scale Factors. Thus, the first step is to procure samples of both data and MC events corresponding to the era for which we are measuring our Scale Factors.
 
 Like HiggsDNA, this tool takes as its input NanoAOD files. The script `scripts/nano_postproc.py` takes these NanoAOD files, drops information about the events we don't need, and restructures them into a columnar format (called n-tuples). Depending on where the NanoAOD files you are trying to access are stored, you made need a valid grid certificate to access them. This involves running something like:
 
@@ -49,13 +49,13 @@ python3 scripts/nano_postproc.py --input_dir output/ntuples_MC_2024 --era 2024 -
 ```
 ___
 ## 3) Creating the turn-on curves
-The script `scripts/createTurnOn_multi.py` computes the trigger efficiencies in different $p_\mathrm T$ bins for data and MC, and outputs the result in a single ROOT file, as well as producing some plots in PDF format for a quick sanity check. It uses the skims produced in the previous step. For example:
+The script `scripts/createTurnOn_multi.py` computes the trigger efficiencies in different $p_\mathrm T$ and PNet DM bins for data and MC, and outputs the result in a single ROOT file, as well as producing some plots in PDF format for a quick sanity check. It uses the skims produced in the previous step. For example:
 
 ```
 python3 scripts/createTurnOn_multi.py --input-data output/skim_data_2024.root --input-dy-mc output/skim_mc_2024.root --channels etau,mutau,ditau,ditaujet,ditauANDditaujet --id-algo PNet --working-points VTight --output output/turn_on_2024/TurnOn
 ```
 
-Unlike in early Run 3 (2022/23), in 2024 the set of events passing the `ditaujet` trigger is not a simple subset of those passing the `ditau` trigger. Hence in the command above includes an additional scale factor calculation corresponding to events which pass both the `ditau` and `ditaujet` triggers.
+Unlike in early Run 3 (2022/23), in 2024 the set of events passing the `ditaujet` trigger is not a simple subset of those passing the `ditau` trigger. Hence, the command above includes an additional scale factor calculation corresponding to events which pass both the `ditau` and `ditaujet` triggers.
 
 The choice of `--id-algo` and `--working-points` reflects the current preference of the $\mathrm{H}\rightarrow\tau\tau \ \mathcal{CP}$–working group for analysing late Run 3 data, where we have decided to use the offline selection criterion that hadronic tau candidates must pass the "VTight" working point for "PNetVSjet". For early Run 3 however, "DeepTau2018v2p5VSjet" is used instead. 
 ___
