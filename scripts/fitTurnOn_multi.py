@@ -117,7 +117,7 @@ class FitResults:
 channels = args.channels.split(',')
 decay_modes = args.decay_modes.split(',')
 working_points = args.working_points.split(',')
-ch_validity_thrs = { 'etau': 35, 'mutau': 32, 'ditau': 40, 'ditaujet': 40, }
+ch_validity_thrs = { 'etau': 35, 'mutau': 32, 'ditau': 35, 'ditaujet': 35, 'ditauANDditaujet': 35 }
 
 file = ROOT.TFile(args.input, 'READ')
 os.makedirs(os.path.dirname(args.output), exist_ok=True)

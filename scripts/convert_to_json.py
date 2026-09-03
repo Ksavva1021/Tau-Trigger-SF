@@ -35,7 +35,7 @@ trigtypes = {
     '2022postEE' : ['ditau', 'etau', 'mutau', 'ditaujet'],
     '2023preBPix' : ['ditau', 'etau', 'mutau', 'ditaujet'],
     '2023postBPix' : ['ditau', 'etau', 'mutau', 'ditaujet'],
-    '2024' : ['ditau', 'etau', 'mutau', 'ditaujet']
+    '2024' : ['ditau', 'etau', 'mutau', 'ditaujet', 'ditauANDditaujet']
 }
 
 dms_nonmerged = [-1, 0, 1, 2, 10, 11]
@@ -120,12 +120,10 @@ def kwargs_get(kwargs, kw, default):
 
 
 def getPtThreshold(triggertype):
-  if triggertype == 'ditau':
-    return 39.5
-  elif triggertype == 'ditaujet':
-    return 34.5
+  if triggertype == 'mutau':
+    return 32.
   else:
-    return 24.5
+    return 35.
 
 
 # Functions to build the correction objects
@@ -202,7 +200,7 @@ def convert_trigger(corrs, year, **kwargs):
     'inputs': [
       {'name': "pt",       'type': "real",   'description': "tau pt"},
       {'name': "dm",       'type': "int",    'description': "tau PNet decay mode (0, 1, 2, 10, or 11, -1)"},
-      {'name': "trigtype",       'type': "string",    'description': "Type of trigger: 'ditau', 'etau', 'mutau', 'ditaujet'"},
+      {'name': "trigtype",       'type': "string",    'description': f"Type of trigger: {trigger_types}"},
       {'name': "wp",       'type': "string", 'description': f"{idalgo_dict[year]}VSjet WP: {workingpoints}"},
       {'name': "corrtype",       'type': "string",    'description': "Type of information: 'eff_data', 'eff_mc', 'sf'"},
       {'name': "syst",     'type': "string", 'description': "systematic 'nom', 'up', 'down'"},
@@ -357,7 +355,7 @@ if __name__ == '__main__':
   argParser.add_argument('--workingpoints',   action='store', nargs='*', default = None, help='Select offline working points to convert', 
                             choices=['VVVLoose', 'VVLoose', 'VLoose', 'Loose', 'Medium', 'Tight', 'VTight', 'VVTight'])
   argParser.add_argument('--triggertypes',   action='store', nargs='*', default = None, help='Select trigger types to convert', 
-                            choices=['ditau', 'etau', 'mutau','ditaujet'])
+                            choices=['ditau', 'etau', 'mutau','ditaujet', 'ditauANDditaujet'])
   argParser.add_argument('--correctiontypes',   action='store', nargs='*', default = None, help='Select correction types to convert', 
                             choices=['sf', 'eff_mc', 'eff_data'])
   argParser.add_argument('--outdir',   action='store', default = None, help='Select directory to store output')

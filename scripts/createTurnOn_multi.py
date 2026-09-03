@@ -126,7 +126,10 @@ def CreateHistograms(input_file, channels, decay_modes, discr_name, working_poin
             turnOn_data[dm][wp] = {}
             for channel in channels:
                 turnOn_data[dm][wp][channel] = {}
-                df_ch = df_wp.Filter('pass_{} > 0.5'.format(channel))
+                if channel != 'ditauANDditaujet':
+                    df_ch = df_wp.Filter('pass_{} > 0.5'.format(channel))
+                else:
+                    df_ch = df_wp.Filter('pass_ditau > 0.5 && pass_ditaujet > 0.5')
                 for model_name, hist_model in hist_models.items():
                     turn_on = TurnOnData()
                     turn_on.hist_total = df_wp.Histo1D(hist_model, var, 'weight')
