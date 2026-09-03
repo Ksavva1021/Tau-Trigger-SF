@@ -122,8 +122,7 @@ def kwargs_get(kwargs, kw, default):
 def getPtThreshold(triggertype):
   if triggertype == 'mutau':
     return 32.
-  else:
-    return 35.
+  return 35.
 
 
 # Functions to build the correction objects
